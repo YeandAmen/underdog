@@ -172,6 +172,22 @@ training, local reports, export, and reviewer persistence.
 
 ## Deployment
 
+Production: **https://identityshield.vercel.app**.
+
+Vercel uses the native Go framework and `cmd/server` entrypoint, listens on its
+assigned `PORT`, and stores evidence, manifests, policies, models, reviews, and
+original payloads in durable Neon Postgres. Local SQLite remains available for
+the desktop lab. Provider credentials are encrypted server-side environment
+variables. The active provider is Agent Router, model `gpt-6.1-sol`, at
+`https://agentrouter.org/v1`.
+
+The Vercel project has Deployment Protection enabled. Sign in with the owning
+Vercel account; the application also requires the workspace access token stored
+as `IDENTITYSHIELD_ACCESS_TOKEN` in the owner's local `.env` file. The token is
+not embedded in the browser or committed to GitHub.
+
+See [Vercel operations](docs/VERCEL.md) for deployment and migration commands.
+
 ```sh
 go build -o bin/identityshield ./cmd/identityshield
 ./bin/identityshield serve

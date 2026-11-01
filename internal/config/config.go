@@ -22,6 +22,8 @@ type Config struct {
 	KaggleToken    string
 	KaggleUsername string
 	KaggleKey      string
+	DatabaseURL    string
+	Hosted         bool
 }
 
 func Load() (Config, error) {
@@ -71,6 +73,15 @@ func Load() (Config, error) {
 		KaggleToken:    get("KAGGLE_API_TOKEN", ""),
 		KaggleUsername: get("KAGGLE_USERNAME", ""),
 		KaggleKey:      get("KAGGLE_KEY", ""),
+		DatabaseURL:    get("DATABASE_URL", ""),
+		Hosted:         get("VERCEL", "") == "1",
+	}
+	if c.Hosted {
+		c.DataDir = "/tmp/identityshield"
+		c.Addr = ":" + get("PORT", "3000")
+		if c.DatabaseURL == "" {
+			return Config{}, errors.New("DATABASE_URL is required for durable Vercel storage")
+		}
 	}
 	if c.AIProvider != "agentrouter" && c.AIProvider != "openrouter" && c.AIProvider != "ollama" && c.AIProvider != "local" {
 		return Config{}, errors.New("AI provider must be agentrouter, openrouter, ollama, or local")

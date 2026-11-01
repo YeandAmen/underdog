@@ -15,3 +15,6 @@ playwright-report/
 *.pem
 *.key
 kaggle.json
+.vercel
+.env*
+!.env.example

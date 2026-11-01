@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -55,6 +54,12 @@ type workspaceCache struct {
 
 func New(c config.Config) (*Server, error) {
 	db, err := store.Open(c.DataDir)
+	if c.DatabaseURL != "" {
+		if db != nil {
+			db.Close()
+		}
+		db, err = store.OpenPostgres(context.Background(), c.DatabaseURL)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -241,11 +246,18 @@ func (s *Server) load(ctx context.Context) ([]domain.Event, domain.Snapshot, []d
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 	revision := s.revision.Load()
+	if s.Store.DB.Postgres {
+		var err error
+		revision, err = s.Store.Revision(ctx)
+		if err != nil {
+			return nil, domain.Snapshot{}, nil, err
+		}
+	}
 	if s.cache != nil && s.cache.revision == revision {
 		return s.cache.events, s.cache.snapshot, s.cache.incidents, nil
 	}
 	events, snapshot, incidents, err := s.loadFresh(ctx)
-	if err == nil && revision == s.revision.Load() {
+	if err == nil && (s.Store.DB.Postgres || revision == s.revision.Load()) {
 		s.cache = &workspaceCache{revision: revision, events: events, snapshot: snapshot, incidents: incidents}
 	}
 	return events, snapshot, incidents, err
@@ -740,11 +752,7 @@ func (s *Server) saveImport(ctx context.Context, name, source, format, license, 
 			return domain.Dataset{}, errors.New("source URL must be an HTTP(S) publisher URL without credentials")
 		}
 	}
-	dir := filepath.Join(s.Config.DataDir, "imports")
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return domain.Dataset{}, err
-	}
-	if err := os.WriteFile(filepath.Join(dir, result.SHA256+".payload"), raw, 0600); err != nil {
+	if err := s.Store.PutPayload(ctx, s.Config.DataDir, result.SHA256, raw); err != nil {
 		return domain.Dataset{}, err
 	}
 	d := domain.Dataset{ID: id, Name: name, Source: source, Format: format, ImportedAt: time.Now().UTC(), SHA256: result.SHA256, SourceURL: sourceURL, License: license, Synthetic: source == "synthetic-lab", Notes: strings.TrimSpace(notes)}
@@ -844,7 +852,7 @@ func (s *Server) reprocess(w http.ResponseWriter, r *http.Request) {
 		if dataset.ID != r.PathValue("id") || len(dataset.SHA256) != 64 {
 			continue
 		}
-		raw, err := os.ReadFile(filepath.Join(s.Config.DataDir, "imports", dataset.SHA256+".payload"))
+		raw, err := s.Store.Payload(r.Context(), s.Config.DataDir, dataset.SHA256)
 		if err != nil {
 			problem(w, http.StatusNotFound, "Original import payload is not available")
 			return
@@ -1052,6 +1060,13 @@ func (s *Server) exportReport(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) changed() {
 	s.revision.Add(1)
+	if s.Store.DB.Postgres {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.Store.BumpRevision(ctx); err != nil {
+			slog.Error("persistent revision update failed")
+		}
+	}
 	select {
 	case s.changes <- struct{}{}:
 	default:

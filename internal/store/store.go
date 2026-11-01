@@ -13,16 +13,17 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type Store struct{ DB *sql.DB }
+type Store struct{ DB *Database }
 
 func Open(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dir, "identityshield.db"))
+	raw, err := sql.Open("sqlite", filepath.Join(dir, "identityshield.db"))
 	if err != nil {
 		return nil, err
 	}
+	db := &Database{DB: raw}
 	db.SetMaxOpenConns(1)
 	_, err = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
 		CREATE TABLE IF NOT EXISTS events (
@@ -39,18 +40,25 @@ func Open(dir string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if _, err := db.ExecContext(context.Background(), schema); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{DB: db}, nil
 }
 
 func (s *Store) Close() error { return s.DB.Close() }
 
 func (s *Store) Import(ctx context.Context, dataset domain.Dataset, events []domain.Event) (domain.Dataset, error) {
+	if s.DB.Postgres {
+		return s.importPostgres(ctx, dataset, events)
+	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return dataset, err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.PrepareContext(ctx, `INSERT OR IGNORE INTO events(id,occurred_at,source,dataset_id,run_id,actor,kind,label,data) VALUES(?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO events(id,occurred_at,source,dataset_id,run_id,actor,kind,label,data) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`)
 	if err != nil {
 		return dataset, err
 	}
@@ -251,7 +259,7 @@ func (s *Store) LabelEvent(ctx context.Context, id, label, reviewer, reason stri
 	if err := json.Unmarshal([]byte(datasetRaw), &dataset); err != nil {
 		return err
 	}
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(label='benign'),0),COALESCE(SUM(label='malicious'),0),COALESCE(SUM(label='unknown'),0) FROM events WHERE dataset_id=?`, event.DatasetID).Scan(&dataset.EventCount, &dataset.BenignCount, &dataset.MaliciousCount, &dataset.UnknownCount); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(CASE WHEN label='benign' THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN label='malicious' THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN label='unknown' THEN 1 ELSE 0 END),0) FROM events WHERE dataset_id=?`, event.DatasetID).Scan(&dataset.EventCount, &dataset.BenignCount, &dataset.MaliciousCount, &dataset.UnknownCount); err != nil {
 		return err
 	}
 	datasetJSON, err := json.Marshal(dataset)
