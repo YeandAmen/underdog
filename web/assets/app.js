@@ -42,6 +42,7 @@ const title = value => String(value || '').replaceAll('_', ' ').replaceAll('-', 
 const short = (value, max = 26) => String(value).length > max ? String(value).slice(0, max - 1) + '…' : String(value);
 const date = value => new Date(value).toLocaleDateString('en', {month:'short',day:'numeric'});
 const utc = value => new Date(value).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',timeZone:'UTC'});
+const providerName = value => value==='openrouter'?'OpenRouter':value==='agentrouter'?'Agent Router':value==='ollama'?'Ollama':'Local';
 function ago(value) {
   const seconds = Math.max(0, (Date.now() - new Date(value)) / 1000);
   if (seconds < 60) return 'just now';
@@ -327,7 +328,7 @@ async function openIncident(id) {
   const synthetic=info.events.every(event=>event.source==='synthetic-lab');
   const dialog=modal(`<header class="investigation-header"><div class="case-id-row"><span class="case-id">${icon('shield',13)}${esc(incident.id)}<span class="slash">/</span>${esc(incident.rule_id)}${badge(incident.severity)}</span><button class="icon-button" data-close aria-label="Close investigation">${icon('close',18)}</button></div><h2>${esc(incident.title)}</h2><div class="incident-meta"><span>${icon('user',12)}${esc(incident.actor)}</span><span>${icon('server',12)}${esc(incident.host)}</span><span>${icon('clock',12)}${date(incident.started_at)} · ${utc(incident.started_at)} UTC</span><span class="badge badge-outline">${synthetic?'Synthetic lab evidence':'Imported evidence'}</span></div></header>
     <div class="investigation-body"><section class="evidence-pane"><div class="pane-heading"><h3>Follow the evidence</h3><span class="mono muted" style="font-size:9px">${info.events.length} EVENTS</span></div><p class="evidence-intro">${esc(incident.summary)} Related events are correlated by source, run, and a bounded time window.</p><div id="incident-timeline">${timeline(info.events,matching)}</div>${incident.findings.length?`<div class="report-label">Linked access context</div>${incident.findings.map(finding=>`<div class="linked-access"><strong>${esc(finding.user_name)} · ${esc(title(finding.right))}</strong><p>${esc(finding.reason)}</p><span class="mono">${esc(finding.path.join(' → '))}</span></div>`).join('')}`:''}</section>
-    <section class="analyst-pane"><div class="pane-heading"><h3>${iconInline('spark')}Analyst workspace</h3><span class="badge badge-outline">Evidence-backed</span></div><div id="report-content">${reportHTML(info.report || info.brief)}</div><div id="report-message" data-form-message></div><div class="report-tools"><button class="btn btn-primary btn-small" data-action="generate-report">${icon('spark',12)}Generate AI report</button><button class="btn btn-small" data-action="save-brief">${icon('file',12)}Save local brief</button>${info.report?'<button class="btn btn-small" data-action="export-report">'+icon('download',12)+'Export</button>':''}</div><p class="ai-disclosure">${data.ai.remote?'Agent Router sends only the selected normalized incident evidence and permission context to '+esc(data.ai.model)+'. Raw logs and truth labels are omitted.':'Configured mode: '+esc(data.ai.provider)+'. Local evidence briefs require no model connection.'}</p></section></div>
+    <section class="analyst-pane"><div class="pane-heading"><h3>${iconInline('spark')}Analyst workspace</h3><span class="badge badge-outline">Evidence-backed</span></div><div id="report-content">${reportHTML(info.report || info.brief)}</div><div id="report-message" data-form-message></div><div class="report-tools"><button class="btn btn-primary btn-small" data-action="generate-report">${icon('spark',12)}Generate AI report</button><button class="btn btn-small" data-action="save-brief">${icon('file',12)}Save local brief</button>${info.report?'<button class="btn btn-small" data-action="export-report">'+icon('download',12)+'Export</button>':''}</div><p class="ai-disclosure">${data.ai.remote?providerName(data.ai.provider)+' sends only the selected normalized incident evidence and permission context to '+esc(data.ai.model)+'. Raw logs and truth labels are omitted.':'Configured mode: '+esc(data.ai.provider)+'. Local evidence briefs require no model connection.'}</p></section></div>
     <footer class="investigation-footer"><span>Priority ${incident.priority}/100 · deterministic ranking, not probability</span><div class="actions"><button class="btn btn-small" data-action="review-case">${icon('check',12)}Record verdict</button><button class="btn btn-small" data-action="copy-bundle">${icon('copy',12)}Copy evidence</button></div></footer>`,'investigation-dialog');
   if(!data.ai.configured || data.ai.provider==='local') dialog.querySelector('[data-action="generate-report"]').disabled=true;
   const analystPane=dialog.querySelector('.analyst-pane');
@@ -430,14 +431,20 @@ async function importSnapshot() {
 
 function settingsDialog() {
   const dialog=modal(`${modalHeader('A considered setup.','The Go server owns credentials. The browser only sees configuration status.')}<div class="modal-body"><div class="form-field"><label for="analyst-name">Your reviewer name</label><input class="input" id="analyst-name" value="${esc(analystName)}"></div><dl><div class="key-value"><dt>Inference</dt><dd>${esc(data.ai.provider)} · <code>${esc(data.ai.model)}</code></dd></div><div class="key-value"><dt>Endpoint</dt><dd>${esc(data.ai.host)}</dd></div><div class="key-value"><dt>Credential</dt><dd>${data.ai.configured?'Configured; live validity is checked separately':'Not configured'}</dd></div><div class="key-value"><dt>Kaggle</dt><dd>${data.kaggle_configured?'Server credential configured':'Token not present'}</dd></div></dl><div class="code-block"># Set these in the ignored .env file, then restart:
-AGENT_ROUTER_API_KEY=&lt;your replacement key&gt;
-IDENTITYSHIELD_AI_MODEL=gpt-6.1-sol
-AGENT_ROUTER_BASE_URL=https://agentrouter.org/v1
+${data.ai.provider==='openrouter'?'OPENROUTER_API_KEY':'AGENT_ROUTER_API_KEY'}=&lt;your replacement key&gt;
+IDENTITYSHIELD_AI_PROVIDER=${esc(data.ai.provider)}
+IDENTITYSHIELD_AI_MODEL=${esc(data.ai.model)}
+IDENTITYSHIELD_AI_BASE_URL=${data.ai.provider==='openrouter'?'https://openrouter.ai/api/v1':'https://agentrouter.org/v1'}
+
+# OpenRouter alternative:
+IDENTITYSHIELD_AI_PROVIDER=openrouter
+IDENTITYSHIELD_AI_MODEL=openai/gpt-6.1-sol
+IDENTITYSHIELD_AI_BASE_URL=https://openrouter.ai/api/v1
 
 # Optional genuinely local inference:
 IDENTITYSHIELD_AI_PROVIDER=ollama
 IDENTITYSHIELD_AI_MODEL=qwen3:8b
-IDENTITYSHIELD_AI_BASE_URL=http://127.0.0.1:11434/v1</div><p class="muted" style="font-size:11px;line-height:1.8">Agent Router is cloud inference. Selected incident evidence leaves this machine when you generate an AI report. Local evidence briefs are deterministic and work offline.</p><div data-form-message></div></div><footer class="modal-footer"><button class="btn" id="check-provider">${icon('activity',12)}Check connection</button><button class="btn btn-primary" id="save-settings">Save preferences</button></footer>`);
+IDENTITYSHIELD_AI_BASE_URL=http://127.0.0.1:11434/v1</div><p class="muted" style="font-size:11px;line-height:1.8">OpenRouter and Agent Router use cloud inference. Selected incident evidence leaves this machine when you generate an AI report. Local evidence briefs are deterministic and work offline.</p><div data-form-message></div></div><footer class="modal-footer"><button class="btn" id="check-provider">${icon('activity',12)}Check connection</button><button class="btn btn-primary" id="save-settings">Save preferences</button></footer>`);
   dialog.querySelector('#save-settings').addEventListener('click',()=>{analystName=dialog.querySelector('#analyst-name').value.trim()||'analyst';try{localStorage.setItem('identityshield-analyst',analystName);}catch{}closeModal();toast('Reviewer preferences saved.');});
   dialog.querySelector('#check-provider').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const result=await api('/api/ai/check',{method:'POST'});dialog.querySelector('[data-form-message]').innerHTML=`<div class="inline-success">Connected to ${esc(result.provider)} · ${esc(result.model)}.</div>`;}catch(error){inlineError(dialog,error);}finally{button.disabled=false;}});
 }

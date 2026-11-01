@@ -403,7 +403,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		"incidents": incidents, "rules": rules, "datasets": imports, "catalog": datasets.Catalog(),
 		"models": models, "counts": counts, "series": series, "reviews": reviews,
 		"data_mode": dataMode, "now": now, "analysis_window_limit": 200000,
-		"ai":                map[string]any{"provider": s.Config.AIProvider, "model": s.Config.AIModel, "configured": s.Config.AIKey != "" || s.Config.AIProvider != "agentrouter", "remote": s.Config.AIProvider == "agentrouter", "host": base.Host},
+		"ai":                map[string]any{"provider": s.Config.AIProvider, "model": s.Config.AIModel, "configured": s.Config.AIKey != "" || s.Config.AIProvider == "local" || s.Config.AIProvider == "ollama", "remote": s.Config.AIProvider == "agentrouter" || s.Config.AIProvider == "openrouter", "host": base.Host},
 		"kaggle_configured": s.Config.KaggleToken != "" || (s.Config.KaggleUsername != "" && s.Config.KaggleKey != ""),
 		"scenarios":         lab.ScenarioNames(),
 	})

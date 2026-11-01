@@ -72,8 +72,13 @@ func Load() (Config, error) {
 		KaggleUsername: get("KAGGLE_USERNAME", ""),
 		KaggleKey:      get("KAGGLE_KEY", ""),
 	}
-	if c.AIProvider != "agentrouter" && c.AIProvider != "ollama" && c.AIProvider != "local" {
-		return Config{}, errors.New("AI provider must be agentrouter, ollama, or local")
+	if c.AIProvider != "agentrouter" && c.AIProvider != "openrouter" && c.AIProvider != "ollama" && c.AIProvider != "local" {
+		return Config{}, errors.New("AI provider must be agentrouter, openrouter, ollama, or local")
+	}
+	if c.AIProvider == "openrouter" {
+		c.AIBaseURL = get("IDENTITYSHIELD_AI_BASE_URL", get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"))
+		c.AIModel = get("IDENTITYSHIELD_AI_MODEL", "openai/gpt-6.1-sol")
+		c.AIKey = get("OPENROUTER_API_KEY", get("IDENTITYSHIELD_AI_API_KEY", c.AIKey))
 	}
 	if c.AIProvider == "ollama" {
 		c.AIBaseURL = get("IDENTITYSHIELD_AI_BASE_URL", "http://127.0.0.1:11434/v1")

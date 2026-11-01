@@ -83,7 +83,7 @@ Synthetic lab results are explicitly scoped to the controlled corpus.
 
 ## Analyst boundary
 
-Agent Router uses the Responses API. Ollama uses its local OpenAI-compatible
+Agent Router and OpenRouter use the Responses API. Ollama uses its local OpenAI-compatible
 chat endpoint. The local brief is a deterministic template, not LLM inference.
 
 Reports receive selected normalized evidence, matched rule descriptions, and

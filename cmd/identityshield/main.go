@@ -50,7 +50,7 @@ func run() error {
 		if err := flags.Parse(args); err != nil {
 			return err
 		}
-		fmt.Printf("Go workspace: ready\nListen: %s\nStorage: %s\nAI provider: %s\nAI model: %s\nAgent Router credential present: %t\nKaggle credential present: %t\nSynthetic starter data: %t\n", cfg.Addr, cfg.DataDir, cfg.AIProvider, cfg.AIModel, cfg.AIKey != "", cfg.KaggleToken != "" || cfg.KaggleUsername != "" && cfg.KaggleKey != "", cfg.Demo)
+		fmt.Printf("Go workspace: ready\nListen: %s\nStorage: %s\nAI provider: %s\nAI model: %s\nInference credential present: %t\nKaggle credential present: %t\nSynthetic starter data: %t\n", cfg.Addr, cfg.DataDir, cfg.AIProvider, cfg.AIModel, cfg.AIKey != "", cfg.KaggleToken != "" || cfg.KaggleUsername != "" && cfg.KaggleKey != "", cfg.Demo)
 		if *check {
 			ctx, cancel := context.WithTimeout(context.Background(), 110*time.Second)
 			defer cancel()

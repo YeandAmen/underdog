@@ -63,8 +63,8 @@ func (c *Client) Report(ctx context.Context, incident domain.Incident, events []
 	if c.Config.AIProvider == "local" {
 		return Template(incident, events), nil
 	}
-	if c.Config.AIProvider == "agentrouter" && c.Config.AIKey == "" {
-		return domain.Report{}, errors.New("Agent Router is not configured; set AGENT_ROUTER_API_KEY or choose the local evidence brief")
+	if c.Config.AIProvider != "ollama" && c.Config.AIKey == "" {
+		return domain.Report{}, fmt.Errorf("%s is not configured; set its server-side API key or choose the local evidence brief", c.Config.AIProvider)
 	}
 	input, err := json.Marshal(evidence(incident, events))
 	if err != nil {
@@ -117,6 +117,9 @@ func (c *Client) request(ctx context.Context, endpoint string, payload map[strin
 	request.Header.Set("Accept", "application/json")
 	if c.Config.AIKey != "" && c.Config.AIProvider != "ollama" {
 		request.Header.Set("Authorization", "Bearer "+c.Config.AIKey)
+	}
+	if c.Config.AIProvider == "openrouter" {
+		request.Header.Set("X-OpenRouter-Title", "IdentityShield")
 	}
 	response, err := c.HTTP.Do(request)
 	if err != nil {
@@ -234,8 +237,8 @@ func (c *Client) Check(ctx context.Context) error {
 	if c.Config.AIProvider == "local" {
 		return nil
 	}
-	if c.Config.AIProvider == "agentrouter" && c.Config.AIKey == "" {
-		return errors.New("AGENT_ROUTER_API_KEY is not configured")
+	if c.Config.AIProvider != "ollama" && c.Config.AIKey == "" {
+		return fmt.Errorf("%s server-side API key is not configured", c.Config.AIProvider)
 	}
 	endpoint := strings.TrimRight(c.Config.AIBaseURL, "/")
 	var payload map[string]any

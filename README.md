@@ -81,6 +81,19 @@ payloads and ground-truth labels are omitted. Citation membership is validated;
 the meaning of claims remains an analyst-review task.
 
 A deterministic **local evidence brief** works without any model connection.
+OpenRouter is also supported through the same Responses protocol:
+
+```dotenv
+IDENTITYSHIELD_AI_PROVIDER=openrouter
+IDENTITYSHIELD_AI_MODEL=openai/gpt-6.1-sol
+IDENTITYSHIELD_AI_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_API_KEY=your-working-openrouter-key
+```
+
+The `openai/` prefix is the model ID listed in OpenRouter's catalogue. Changing
+the gateway does not make an invalid key valid; OpenRouter authentication must
+succeed independently. This is remote inference, with the same evidence boundary.
+
 For a genuinely local LLM, use a running Ollama server:
 
 ```dotenv
