@@ -1,0 +1,18 @@
+services:
+  identityshield:
+    build: .
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      IDENTITYSHIELD_ADDR: "0.0.0.0:8787"
+      IDENTITYSHIELD_ACCESS_TOKEN: "${IDENTITYSHIELD_ACCESS_TOKEN:?Set a workspace access token in your local environment}"
+      IDENTITYSHIELD_AI_PROVIDER: "${IDENTITYSHIELD_AI_PROVIDER:-agentrouter}"
+      IDENTITYSHIELD_AI_MODEL: "${IDENTITYSHIELD_AI_MODEL:-gpt-6.1-sol}"
+      AGENT_ROUTER_BASE_URL: "${AGENT_ROUTER_BASE_URL:-https://agentrouter.org/v1}"
+      AGENT_ROUTER_API_KEY: "${AGENT_ROUTER_API_KEY:-}"
+      KAGGLE_API_TOKEN: "${KAGGLE_API_TOKEN:-}"
+    volumes:
+      - identityshield-data:/app/data
+    restart: unless-stopped
+volumes:
+  identityshield-data:

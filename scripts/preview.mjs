@@ -1,0 +1,28 @@
+import {chromium} from '@playwright/test';
+import {mkdir} from 'node:fs/promises';
+import {join} from 'node:path';
+
+const url=process.argv[2]||'http://127.0.0.1:8787';
+const output=process.argv[3]||'test-results/preview';
+await mkdir(output,{recursive:true});
+const browser=await chromium.launch();
+const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+const errors=[];page.on('pageerror',error=>errors.push(error.message));
+await page.goto(url);
+await page.getByRole('heading',{name:'Security, in context.'}).waitFor();
+await page.screenshot({path:join(output,'overview-light.png'),fullPage:true});
+await page.getByRole('button',{name:'Toggle color theme'}).click();
+await page.screenshot({path:join(output,'overview-dark.png'),fullPage:true});
+await page.getByRole('button',{name:'Toggle color theme'}).click();
+await page.locator('[data-open-case]').first().click();
+await page.locator('.investigation-dialog').waitFor();
+await page.screenshot({path:join(output,'investigation.png')});
+await page.keyboard.press('Escape');
+await page.setViewportSize({width:390,height:844});
+await page.screenshot({path:join(output,'overview-mobile.png'),fullPage:true});
+await page.getByRole('link',{name:'Research',exact:true}).click();
+await page.getByRole('heading',{name:'An experiment you can explain.'}).waitFor();
+await page.screenshot({path:join(output,'research-mobile.png'),fullPage:true});
+console.log(JSON.stringify({screenshots:output,browserErrors:errors}));
+await browser.close();
+if(errors.length)process.exitCode=1;

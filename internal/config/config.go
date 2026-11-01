@@ -1,0 +1,97 @@
+package config
+
+import (
+	"bufio"
+	"errors"
+	"net"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type Config struct {
+	Addr           string
+	DataDir        string
+	Demo           bool
+	AccessToken    string
+	AIProvider     string
+	AIModel        string
+	AIBaseURL      string
+	AIKey          string
+	KaggleToken    string
+	KaggleUsername string
+	KaggleKey      string
+}
+
+func Load() (Config, error) {
+	values := map[string]string{}
+	f, err := os.Open(".env")
+	if err == nil {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			key, value, ok := strings.Cut(strings.TrimPrefix(line, "export "), "=")
+			if ok {
+				values[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), "\"'")
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return Config{}, err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return Config{}, err
+	}
+	get := func(key, fallback string) string {
+		if v, ok := os.LookupEnv(key); ok {
+			return v
+		}
+		if v, ok := values[key]; ok {
+			return v
+		}
+		return fallback
+	}
+	demo, err := strconv.ParseBool(get("IDENTITYSHIELD_DEMO", "true"))
+	if err != nil {
+		return Config{}, errors.New("IDENTITYSHIELD_DEMO must be true or false")
+	}
+	c := Config{
+		Addr:           get("IDENTITYSHIELD_ADDR", "127.0.0.1:8787"),
+		DataDir:        get("IDENTITYSHIELD_DATA_DIR", "./data"),
+		Demo:           demo,
+		AccessToken:    get("IDENTITYSHIELD_ACCESS_TOKEN", ""),
+		AIProvider:     get("IDENTITYSHIELD_AI_PROVIDER", "agentrouter"),
+		AIModel:        get("IDENTITYSHIELD_AI_MODEL", "gpt-6.1-sol"),
+		AIBaseURL:      get("IDENTITYSHIELD_AI_BASE_URL", get("AGENT_ROUTER_BASE_URL", "https://agentrouter.org/v1")),
+		AIKey:          get("AGENT_ROUTER_API_KEY", get("AGENTROUTER_API_KEY", "")),
+		KaggleToken:    get("KAGGLE_API_TOKEN", ""),
+		KaggleUsername: get("KAGGLE_USERNAME", ""),
+		KaggleKey:      get("KAGGLE_KEY", ""),
+	}
+	if c.AIProvider != "agentrouter" && c.AIProvider != "ollama" && c.AIProvider != "local" {
+		return Config{}, errors.New("AI provider must be agentrouter, ollama, or local")
+	}
+	if c.AIProvider == "ollama" {
+		c.AIBaseURL = get("IDENTITYSHIELD_AI_BASE_URL", "http://127.0.0.1:11434/v1")
+		c.AIModel = get("IDENTITYSHIELD_AI_MODEL", "qwen3:8b")
+	}
+	u, err := url.Parse(c.AIBaseURL)
+	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return Config{}, errors.New("AI base URL must be an absolute HTTP(S) URL without credentials or query parameters")
+	}
+	if u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || net.ParseIP(u.Hostname()).IsLoopback())) {
+		return Config{}, errors.New("AI endpoint requires HTTPS, except for a loopback local provider")
+	}
+	host, _, err := net.SplitHostPort(c.Addr)
+	if err != nil {
+		return Config{}, errors.New("listen address must use host:port")
+	}
+	if host != "localhost" && !net.ParseIP(host).IsLoopback() && c.AccessToken == "" {
+		return Config{}, errors.New("set IDENTITYSHIELD_ACCESS_TOKEN when listening outside loopback")
+	}
+	return c, nil
+}

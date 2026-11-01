@@ -1,0 +1,31 @@
+{
+  "organization": "Northstar Manufacturing",
+  "policy_version": "RBAC-2026.01",
+  "search_base": "OU=IdentityShield,DC=identityshield,DC=test",
+  "users": [
+    {"name":"maya.chen","role":"Helpdesk operator","department":"IT support"},
+    {"name":"noah.williams","role":"Finance employee","department":"Finance"},
+    {"name":"ava.patel","role":"HR employee","department":"People"},
+    {"name":"leo.martin","role":"OT engineer","department":"Operations"},
+    {"name":"alex.rivera","role":"IT administrator","department":"Infrastructure"},
+    {"name":"svc.backup","role":"Backup service","department":"Infrastructure"}
+  ],
+  "assets": [
+    {"id":"ns-dc01","name":"NS-DC01","kind":"domain-controller","zone":"IT","critical":true,"scope_dn":"DC=identityshield,DC=test"},
+    {"id":"ns-ws01","name":"NS-WS01","kind":"workstation","zone":"IT","critical":false},
+    {"id":"ns-eng01","name":"NS-ENG01","kind":"engineering-workstation","zone":"OT","critical":true},
+    {"id":"ns-fin01","name":"NS-FIN01","kind":"file-server","zone":"IT","critical":true},
+    {"id":"staff-ou","name":"OU / Staff","kind":"organizational-unit","zone":"IT","critical":false,"scope_dn":"OU=Staff,OU=IdentityShield,DC=identityshield,DC=test"}
+  ],
+  "policies": [
+    {"role":"Helpdesk operator","resource":"staff-ou","rights":["reset-password"]},
+    {"role":"Helpdesk operator","resource":"ns-ws01","rights":["remote-logon"]},
+    {"role":"Finance employee","resource":"ns-fin01","rights":["read","write","remote-logon"]},
+    {"role":"HR employee","resource":"ns-ws01","rights":["remote-logon"]},
+    {"role":"OT engineer","resource":"ns-eng01","rights":["remote-logon","local-admin"]},
+    {"role":"IT administrator","resource":"ns-ws01","rights":["remote-logon","local-admin"]},
+    {"role":"IT administrator","resource":"ns-dc01","rights":["replicate-directory"]},
+    {"role":"Backup service","resource":"ns-fin01","rights":["read"]}
+  ],
+  "approvals": []
+}
