@@ -171,6 +171,10 @@ func (s *Server) Handler() http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		if (r.URL.Path == "/datasets" || r.URL.Path == "/research") && !s.researchAccess(r) {
+			http.NotFound(w, r)
+			return
+		}
 		body, _ := web.Files.ReadFile("index.html")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(body)
@@ -186,6 +190,10 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
+			if researchEndpoint(r) && !s.researchAccess(r) {
+				problem(w, http.StatusUnauthorized, "Owner access required")
+				return
+			}
 			workerRequest := r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/ai/worker/")
 			if r.URL.Path != "/api/health" && !workerRequest && s.Config.AccessToken != "" && !s.Config.PublicAccess {
 				token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -412,7 +420,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	base, _ := url.Parse(s.Config.AIBaseURL)
-	respond(w, http.StatusOK, map[string]any{
+	response := map[string]any{
 		"organization": snapshot.Organization, "snapshot": snapshot, "findings": findings,
 		"incidents": incidents, "rules": rules, "datasets": imports, "catalog": datasets.Catalog(),
 		"models": models, "counts": counts, "series": series, "reviews": reviews,
@@ -420,7 +428,39 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		"ai":                map[string]any{"provider": s.Config.AIProvider, "model": s.Config.AIModel, "engine": s.Config.AIBackend, "configured": s.Config.AIKey != "" || s.Config.AIProvider == "local" || s.Config.AIProvider == "ollama" || s.Config.AIBackend == "worker" && s.Config.WorkerToken != "", "remote": s.Config.AIProvider == "agentrouter" || s.Config.AIProvider == "openrouter", "host": base.Host, "worker": s.Store.WorkerStatus(r.Context())},
 		"kaggle_configured": s.Config.KaggleToken != "" || (s.Config.KaggleUsername != "" && s.Config.KaggleKey != ""),
 		"scenarios":         lab.ScenarioNames(),
-	})
+		"research_access":   s.researchAccess(r),
+	}
+	if !s.researchAccess(r) {
+		for _, key := range []string{"datasets", "catalog", "models", "data_mode", "kaggle_configured", "scenarios", "analysis_window_limit"} {
+			delete(response, key)
+		}
+		for _, key := range []string{"benign", "malicious", "unknown", "synthetic_events"} {
+			delete(counts, key)
+		}
+		publicIncidents := make([]map[string]any, len(incidents))
+		for i, incident := range incidents {
+			publicIncidents[i] = s.publicIncident(incident)
+		}
+		response["incidents"] = publicIncidents
+		response["reviews"] = map[string]domain.Review{}
+		publicRules := make([]map[string]any, len(rules))
+		for i, rule := range rules {
+			publicRules[i] = map[string]any{"id": rule.ID, "name": rule.Name, "description": rule.Description, "severity": rule.Severity, "technique": rule.Technique, "enabled": rule.Enabled, "matches": rule.Matches}
+		}
+		response["rules"] = publicRules
+		response["snapshot"] = map[string]any{
+			"organization": snapshot.Organization, "captured_at": snapshot.CapturedAt,
+			"users": snapshot.Users, "groups": snapshot.Groups, "assets": snapshot.Assets,
+			"grants": snapshot.Grants, "policies": snapshot.Policies,
+		}
+		response["ai"] = map[string]any{
+			"engine": s.Config.AIBackend, "local": s.Config.AIProvider == "local",
+			"configured": s.Config.AIKey != "" || s.Config.AIProvider == "local" || s.Config.AIProvider == "ollama" || s.Config.AIBackend == "worker" && s.Config.WorkerToken != "",
+			"remote":     s.Config.AIProvider == "agentrouter" || s.Config.AIProvider == "openrouter",
+			"worker":     s.Store.WorkerStatus(r.Context()),
+		}
+	}
+	respond(w, http.StatusOK, response)
 }
 
 func bundle(events []domain.Event, snapshot domain.Snapshot, incident domain.Incident) (domain.Incident, []domain.Event) {
@@ -488,7 +528,16 @@ func (s *Server) incident(w http.ResponseWriter, r *http.Request) {
 	if existing, err := s.Store.Report(r.Context(), incident.ID); err == nil && existing.EvidenceHash == incident.EvidenceHash {
 		report = &existing
 	}
-	respond(w, http.StatusOK, map[string]any{"incident": incident, "events": events, "brief": analyst.Template(incident, events), "report": report})
+	brief := s.presentedReport(r, analyst.Template(incident, events), events)
+	if report != nil {
+		presented := s.presentedReport(r, *report, events)
+		report = &presented
+	}
+	if !s.researchAccess(r) {
+		respond(w, http.StatusOK, map[string]any{"incident": s.publicIncident(incident), "events": s.publicEvents(events), "brief": brief, "report": report})
+		return
+	}
+	respond(w, http.StatusOK, map[string]any{"incident": incident, "events": events, "brief": brief, "report": report})
 }
 
 func (s *Server) report(w http.ResponseWriter, r *http.Request) {
@@ -512,10 +561,14 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusBadRequest, "Requested provider is not configured")
 		return
 	}
+	if !s.researchAccess(r) && strings.HasPrefix(incident.RuleID, "ML-") && client.Config.AIProvider != "local" {
+		problem(w, http.StatusUnauthorized, "Owner access required for research-model reports")
+		return
+	}
 	if s.Config.PublicAccess || s.Config.AIBackend == "worker" {
 		if existing, err := s.Store.Report(r.Context(), incident.ID); err == nil && existing.EvidenceHash == incident.EvidenceHash && existing.Provider == client.Config.AIProvider && existing.Model == client.Config.AIModel {
 			if err := analyst.Validate(existing, events); err == nil {
-				respond(w, http.StatusOK, existing)
+				respond(w, http.StatusOK, s.presentedReport(r, existing, events))
 				return
 			}
 		}
@@ -533,7 +586,7 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusInternalServerError, "Could not save report")
 		return
 	}
-	respond(w, http.StatusOK, report)
+	respond(w, http.StatusOK, s.presentedReport(r, report, events))
 }
 
 func (s *Server) review(w http.ResponseWriter, r *http.Request) {
@@ -1009,7 +1062,7 @@ func (s *Server) checkAI(w http.ResponseWriter, r *http.Request) {
 			problem(w, http.StatusServiceUnavailable, "Our model worker is offline. Reconnect the project terminal to generate reports.")
 			return
 		}
-		respond(w, http.StatusOK, map[string]any{"provider": s.Config.AIProvider, "model": s.Config.AIModel, "engine": "worker"})
+		respond(w, http.StatusOK, map[string]any{"connected": true, "engine": "worker"})
 		return
 	}
 	if err := s.Analyst.Check(r.Context()); err != nil {
@@ -1018,7 +1071,7 @@ func (s *Server) checkAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.Store.Put(r.Context(), "ai_health", map[string]any{"connected": true, "checked_at": time.Now().UTC()})
-	respond(w, http.StatusOK, map[string]any{"connected": true, "provider": s.Config.AIProvider, "model": s.Config.AIModel})
+	respond(w, http.StatusOK, map[string]any{"connected": true, "engine": s.Config.AIBackend})
 }
 
 func (s *Server) exportModel(w http.ResponseWriter, r *http.Request) {
@@ -1053,7 +1106,7 @@ func (s *Server) exportEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) exportReport(w http.ResponseWriter, r *http.Request) {
-	incident, _, err := s.investigation(r.Context(), r.PathValue("id"))
+	incident, events, err := s.investigation(r.Context(), r.PathValue("id"))
 	if err != nil {
 		problem(w, http.StatusNotFound, "Investigation not found")
 		return
@@ -1065,6 +1118,7 @@ func (s *Server) exportReport(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+incident.ID+`-report.md"`)
+	report = s.presentedReport(r, report, events)
 	source := "Our model"
 	if report.Provider == "local" {
 		source = "Local evidence brief"

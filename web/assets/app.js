@@ -59,6 +59,8 @@ const pages = [
   {path:'/datasets',label:'Datasets',icon:'database'},
   {path:'/research',label:'Research',icon:'chart'},
 ];
+const visiblePages = () => pages.filter(page=>data?.research_access || !['/datasets','/research'].includes(page.path));
+const localBriefMode = () => data.ai.local || data.ai.provider==='local';
 
 let data;
 let activeIncident;
@@ -115,7 +117,7 @@ function renderShell() {
   document.querySelector('#app').innerHTML = `
     <header class="topbar"><div class="topbar-inner">
       <a href="/" class="brand" data-route="/" aria-label="Underdog overview"><span class="brand-mark">${icon('shield',20)}</span>Underdog</a>
-      <nav class="topnav" aria-label="Workspace navigation">${pages.map(page => `<a class="nav-link" href="${page.path}" data-route="${page.path}">${page.label}</a>`).join('')}</nav>
+      <nav class="topnav" aria-label="Workspace navigation">${visiblePages().map(page => `<a class="nav-link" href="${page.path}" data-route="${page.path}">${page.label}</a>`).join('')}</nav>
       <div class="top-tools">
         <button class="search-trigger" data-action="search" aria-label="Search workspace"><span>${icon('search',14)}</span><span>Search</span><kbd>⌘ K</kbd></button>
         <button class="icon-button" id="theme-button" data-action="theme" aria-label="Toggle color theme">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon',17)}</button>
@@ -138,12 +140,13 @@ function sectionHeader(number, name, extra = '') { return `<div class="section-h
 function empty(name, message, action = '') { return `<div class="empty"><div class="empty-icon">${icon('folder',19)}</div><h3>${name}</h3><p>${message}</p>${action}</div>`; }
 
 function renderPage() {
+  if(!data.research_access && ['/datasets','/research'].includes(route)) {route='/';history.replaceState({},'',route);}
   document.querySelectorAll('.nav-link').forEach(link => { link.classList.toggle('active', link.dataset.route === route); if (link.dataset.route === route) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current'); });
   document.querySelector('#organization').textContent = data.organization;
-  const views = {'/':overview,'/investigations':investigations,'/identity':identityPage,'/datasets':datasetsPage,'/research':researchPage,'/rules':rulesPage};
+  const views = {'/':overview,'/investigations':investigations,'/identity':identityPage,'/rules':rulesPage,...(data.research_access?{'/datasets':datasetsPage,'/research':researchPage}:{})};
   document.querySelector('#main').innerHTML = `<div class="view">${(views[route] || overview)()}</div>`;
   bindPage();
-  document.title = `Underdog — ${pages.find(p => p.path === route)?.label || 'Detection library'}`;
+  document.title = `Underdog — ${visiblePages().find(p => p.path === route)?.label || 'Detection library'}`;
 }
 
 function navigate(path) {
@@ -158,14 +161,14 @@ function overview() {
   const counts = data.counts;
   const open = data.incidents.filter(item => item.status === 'open');
   const finding = chosenFinding();
-  const model = data.models.authentication;
+  const model = data.models?.authentication;
   const highFindings = data.findings.filter(item => item.severity === 'high').length;
-  return `${heading('A little context goes a long way', 'Security, in context.', 'The right access. The right signals. One clearer picture.', `<button class="btn" data-action="replay">${icon('play',13)}Replay lab</button><button class="btn btn-primary" data-action="import">${icon('plus',13)}Import evidence</button>`)}
-    <div class="source-notice"><div class="notice-copy">${icon(data.data_mode === 'synthetic' ? 'terminal' : 'database',13)}<span>${data.data_mode === 'synthetic' ? 'Controlled lab workspace. All starter events are synthetic; real endpoints are not connected.' : data.data_mode === 'mixed' ? 'Mixed workspace. Imported evidence and explicitly labelled lab scenarios are kept traceable.' : 'Your evidence workspace. Import events and an approved permission snapshot to begin.'}</span></div><code>${esc(data.snapshot.policy_version)}</code></div>
+  return `${heading('A little context goes a long way', 'Security, in context.', 'The right access. The right signals. One clearer picture.', data.research_access?`<button class="btn" data-action="replay">${icon('play',13)}Replay lab</button><button class="btn btn-primary" data-action="import">${icon('plus',13)}Import evidence</button>`:'')}
+    <div class="source-notice"><div class="notice-copy">${icon('shield',13)}<span>${data.research_access?(data.data_mode === 'synthetic' ? 'Controlled lab workspace. All starter events are synthetic; real endpoints are not connected.' : data.data_mode === 'mixed' ? 'Mixed workspace. Imported evidence and explicitly labelled lab scenarios are kept traceable.' : 'Your evidence workspace. Import events and an approved permission snapshot to begin.'):'Office security demo. Explore access paths, activity and example investigations.'}</span></div>${data.research_access?`<code>${esc(data.snapshot.policy_version)}</code>`:''}</div>
     <div class="metrics">
       ${metric('Open investigations', num(counts.open_incidents), `${open.filter(i => i.severity === 'critical').length} high-impact cases to review`, 'shield')}
       ${metric('Permission drift', num(counts.findings), `<span class="accent">${counts.critical_findings} critical</span><span>· ${highFindings} high</span>`, 'network')}
-      ${metric('Evidence events', num(counts.events), `${num(counts.identities)} identities · ${num(data.datasets.length)} source imports`, 'database')}
+      ${metric('Evidence events', num(counts.events), data.research_access?`${num(counts.identities)} identities · ${num(data.datasets.length)} source imports`:`${num(counts.identities)} office identities`, 'database')}
       ${metric('Observed coverage', `${counts.matched_rules}<span class="denominator">/ ${counts.active_rules}</span>`, 'Enabled rules with matches in this corpus', 'activity')}
     </div>
     <div class="content-grid">
@@ -175,12 +178,12 @@ function overview() {
       </section>
       <section class="section">${sectionHeader('03', 'Identity exposure', `<span class="count-pill">${data.findings.length} paths</span>`)}
         <div class="card">${finding ? `<div class="trace-summary"><h3>${esc(finding.user_name)}</h3><p class="role">${esc(finding.role)} → ${esc(title(finding.right))}</p></div>${traceGraphic(finding)}<div class="trace-description">${esc(finding.reason)}</div><div class="card-bottom"><span>Nested access, made visible</span><button class="text-button" data-action="identity">Trace path ${icon('arrow',12)}</button></div>` : empty('No observed drift', 'The supplied permission snapshot matches its declared policy.')}</div>
-        <div class="card brief-card"><div class="brief-title">${icon('spark',15)}A second pair of eyes.</div><p>Turn selected evidence and permission context into a concise, cited investigation brief.</p><div class="report-status" style="margin-top:12px;margin-bottom:0"><span class="dot"></span>${data.ai.provider==='local'?'LOCAL EVIDENCE BRIEF':'OUR MODEL'}</div><button class="text-button" data-action="first-incident">Open analyst workspace ${icon('arrow',12)}</button></div>
+        <div class="card brief-card"><div class="brief-title">${icon('spark',15)}A second pair of eyes.</div><p>Turn selected evidence and permission context into a concise, cited investigation brief.</p><div class="report-status" style="margin-top:12px;margin-bottom:0"><span class="dot"></span>${localBriefMode()?'LOCAL EVIDENCE BRIEF':'OUR MODEL'}</div><button class="text-button" data-action="first-incident">Open analyst workspace ${icon('arrow',12)}</button></div>
       </section>
     </div>
-    <div class="overview-bottom"><section class="section">${sectionHeader('04', 'Workspace activity')}<div class="card activity-list">${[...data.datasets].sort((a,b) => new Date(b.imported_at)-new Date(a.imported_at)).slice(0,3).map(dataset => `<div class="activity-item"><span class="activity-mark">${icon(dataset.synthetic?'terminal':'upload',13)}</span><div class="activity-text">${esc(dataset.name)}<p>${num(dataset.event_count)} events imported · ${esc(dataset.format)} ${dataset.synthetic ? '· synthetic' : ''}</p></div><time>${ago(dataset.imported_at)}</time></div>`).join('') || empty('Ready for evidence', 'Your next import will appear here.')}</div></section>
+    ${data.research_access?`<div class="overview-bottom"><section class="section">${sectionHeader('04', 'Workspace activity')}<div class="card activity-list">${[...data.datasets].sort((a,b) => new Date(b.imported_at)-new Date(a.imported_at)).slice(0,3).map(dataset => `<div class="activity-item"><span class="activity-mark">${icon(dataset.synthetic?'terminal':'upload',13)}</span><div class="activity-text">${esc(dataset.name)}<p>${num(dataset.event_count)} events imported · ${esc(dataset.format)} ${dataset.synthetic ? '· synthetic' : ''}</p></div><time>${ago(dataset.imported_at)}</time></div>`).join('') || empty('Ready for evidence', 'Your next import will appear here.')}</div></section>
       <section class="section">${sectionHeader('05', 'An explainable baseline')}<div class="card model-mini">${model ? `<header><span class="model-name">Isolation Forest</span><span class="badge badge-outline">${model.tree_count} trees</span></header><p class="model-sub">AUTHENTICATION · HELD-OUT WINDOWS</p><div class="mini-metrics"><div class="mini-metric"><strong>${pct(model.metrics.precision)}</strong><span>Precision</span></div><div class="mini-metric"><strong>${pct(model.metrics.recall)}</strong><span>Recall</span></div></div><p class="mini-model-note">${model.test_windows} held-out windows. Actual benchmark results on the ${data.datasets.find(d => d.id === model.dataset_id)?.synthetic ? 'synthetic lab' : 'selected'} corpus.</p><a class="text-button" style="margin-top:12px" href="/research" data-route="/research">Inspect the experiment ${icon('arrow',12)}</a>` : empty('Train your first baseline', 'Label normal activity, preserve independent runs, and evaluate on held-out evidence.')}</div></section>
-    </div>`;
+    </div>`:''}`;
 }
 
 function metric(label, value, note, name) { return `<div class="metric"><div class="metric-label">${label}${icon(name,14)}</div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></div>`; }
@@ -210,18 +213,18 @@ function filteredCases() {
 }
 function caseTable() {
   const items=filteredCases();
-  return `<div class="card investigation-list"><div class="list-heading"><span>${items.length} investigations ${caseFilter.rule?`· ${esc(caseFilter.rule)}`:''}</span><span>Priority · severity · context</span></div>${items.slice(0,caseLimit).map(item=>caseRow(item,true)).join('') || empty('Nothing in this view', 'Try another filter or replay a lab scenario to collect new signals.')}<div class="card-bottom"><span>Showing ${Math.min(caseLimit,items.length)} of ${items.length}</span>${items.length>caseLimit?'<button class="text-button" data-action="more-cases">Show more '+icon('plus',12)+'</button>':'<span>Evidence first. Verdict second.</span>'}</div></div>`;
+  return `<div class="card investigation-list"><div class="list-heading"><span>${items.length} investigations ${caseFilter.rule?`· ${esc(caseFilter.rule)}`:''}</span><span>Priority · severity · context</span></div>${items.slice(0,caseLimit).map(item=>caseRow(item,true)).join('') || empty('Nothing in this view', 'Try another account, host or severity filter.')}<div class="card-bottom"><span>Showing ${Math.min(caseLimit,items.length)} of ${items.length}</span>${items.length>caseLimit?'<button class="text-button" data-action="more-cases">Show more '+icon('plus',12)+'</button>':'<span>Evidence first. Verdict second.</span>'}</div></div>`;
 }
 function investigations() {
-  return `${heading('Follow the evidence', 'A closer look at your signals.', 'Every case brings its events, access paths, and analyst notes into one place.', `<button class="btn" data-action="replay">${icon('play',13)}Replay scenario</button><button class="btn btn-primary" data-action="evidence">${icon('file',13)}Evidence browser</button>`)}
+  return `${heading('Follow the evidence', 'A closer look at your signals.', 'Every case brings its events, access paths, and analyst notes into one place.', data.research_access?`<button class="btn" data-action="replay">${icon('play',13)}Replay scenario</button><button class="btn btn-primary" data-action="evidence">${icon('file',13)}Evidence browser</button>`:'')}
     <div class="toolbar"><div class="search-field">${icon('search',14)}<input id="case-search" type="search" placeholder="Search accounts, hosts, or investigations…" value="${esc(caseFilter.q)}" aria-label="Search investigations"></div><select class="select" id="case-severity" aria-label="Filter severity"><option value="">All severities</option>${['critical','high','medium','low'].map(s=>`<option value="${s}" ${caseFilter.severity===s?'selected':''}>${title(s)}</option>`).join('')}</select><div class="filter-tabs" role="group" aria-label="Investigation status">${['all','open','closed','confirmed'].map(status=>`<button class="filter-tab ${caseFilter.status===status?'active':''}" data-status="${status}">${title(status)}</button>`).join('')}</div></div>
     <div id="case-table">${caseTable()}</div>`;
 }
 
 function identityPage() {
   const finding=chosenFinding();
-  return `${heading('Access, made understandable', 'Know where privilege comes from.', 'Compare observed access against an explicit role policy. Follow every unexpected permission back to its source.', `<button class="btn" data-action="export-snapshot">${icon('download',13)}Export snapshot</button><button class="btn btn-primary" data-action="import-snapshot">${icon('upload',13)}Import snapshot</button>`)}
-    <div class="source-notice"><div class="notice-copy">${icon('branch',13)}<span>${esc(data.snapshot.source)} snapshot · ${date(data.snapshot.captured_at)} · ${esc(data.snapshot.policy_version)}</span></div><span class="mono" style="font-size:9px">7 SUPPORTED NORMALIZED ACTIONS</span></div>
+  return `${heading('Access, made understandable', 'Know where privilege comes from.', 'Compare observed access against an explicit role policy. Follow every unexpected permission back to its source.', data.research_access?`<button class="btn" data-action="export-snapshot">${icon('download',13)}Export snapshot</button><button class="btn btn-primary" data-action="import-snapshot">${icon('upload',13)}Import snapshot</button>`:'')}
+    <div class="source-notice"><div class="notice-copy">${icon('branch',13)}<span>${data.research_access?`${esc(data.snapshot.source)} snapshot · ${date(data.snapshot.captured_at)} · ${esc(data.snapshot.policy_version)}`:`Office access snapshot · ${date(data.snapshot.captured_at)}`}</span></div></div>
     <div class="identity-top"><section class="section">${sectionHeader('01','Outside the approved policy',`<span class="count-pill">${data.findings.length}</span>`)}<div class="card">${data.findings.map(item=>`<button class="finding-row ${finding?.id===item.id?'selected':''}" data-finding="${esc(item.id)}"><span class="case-icon ${item.severity}">${icon('network',14)}</span><span class="finding-copy"><strong>${esc(item.user_name)} <span class="muted">→ ${esc(item.asset_name)}</span></strong><p>${esc(item.role)} · ${esc(title(item.right))}</p></span>${badge(item.severity)}${icon('chevron',12)}</button>`).join('') || empty('Policy matches observed access', 'No discrepancies were found for the supported actions in this snapshot.')}</div></section>
       <section class="section">${sectionHeader('02','The permission path')}<div class="card">${finding?`<div class="card-top"><h3>${esc(finding.user_name)}</h3><span class="badge badge-outline">${esc(title(finding.right))}</span></div><div class="access-graphic">${traceGraphic(finding)}</div><div class="path-tags">${finding.path.map(p=>`<span>${esc(p)}</span>`).join('')}</div><div class="info-box">${esc(finding.reason)}<br><button class="btn btn-small" data-preview="${esc(finding.id)}">${icon('branch',12)}Preview remediation impact</button></div>`:empty('An explainable path', 'Select a discrepancy to inspect its membership and permission chain.')}</div></section></div>
     <section class="section">${sectionHeader('03','People & service identities', `<span class="mono muted" style="font-size:9px">${data.snapshot.users.length} IDENTITIES · ${data.snapshot.groups.length} GROUPS</span>`)}<div class="card table-scroll"><table class="data-table"><thead><tr><th>Identity</th><th>Approved role</th><th>Direct memberships</th><th>Policy drift</th></tr></thead><tbody>${data.snapshot.users.map(user=>{const findings=data.findings.filter(f=>f.user_id===user.id);return `<tr><td><div class="name-cell"><span class="person">${esc(user.name.slice(0,2).toUpperCase())}</span><span><strong>${esc(user.name)}</strong><small>${esc(user.department)}</small></span></div></td><td>${esc(user.role)}</td><td><span class="mono muted">${user.groups.map(g=>esc(data.snapshot.groups.find(group=>group.id===g)?.name ||g)).join(', ') || '—'}</span></td><td>${findings.length?badge(findings[0].severity,`${findings.length} findings`):'<span class="badge good">Within policy</span>'}</td></tr>`;}).join('')}</tbody></table></div></section>
@@ -260,7 +263,7 @@ function scorePlot(model) {
 }
 
 function rulesPage() {
-  return `${heading('Every signal has a reason', 'A library built for inspection.', 'Twelve transparent detections, with their telemetry requirements and known false-positive contexts.', `<button class="btn" data-action="replay">${icon('play',13)}Validate in lab</button>`)}<div class="rule-grid">${data.rules.map(rule=>`<article class="card rule-card"><div class="rule-top"><span class="mono">${esc(rule.id)} · ${esc(rule.technique)}</span><button class="toggle" role="switch" aria-checked="${rule.enabled}" aria-label="Enable ${esc(rule.name)}" data-toggle-rule="${esc(rule.id)}"></button></div><h3>${esc(rule.name)}</h3><p>${esc(rule.description)}</p><details><summary>Telemetry & false-positive context</summary><p><strong>${esc(rule.log_source)}</strong><br>${esc(rule.false_positives)}</p></details><footer>${badge(rule.severity)}<button class="text-button" data-rule-cases="${esc(rule.id)}">${rule.matches} matching cases ${icon('arrow',12)}</button></footer></article>`).join('')}</div>`;
+  return `${heading('Every signal has a reason', 'A library built for inspection.', 'Review the security checks behind the investigation queue.', data.research_access?`<button class="btn" data-action="replay">${icon('play',13)}Validate in lab</button>`:'')}<div class="rule-grid">${data.rules.map(rule=>`<article class="card rule-card"><div class="rule-top"><span class="mono">${esc(rule.id)} · ${esc(rule.technique)}</span>${data.research_access?`<button class="toggle" role="switch" aria-checked="${rule.enabled}" aria-label="Enable ${esc(rule.name)}" data-toggle-rule="${esc(rule.id)}"></button>`:''}</div><h3>${esc(rule.name)}</h3><p>${esc(rule.description)}</p>${data.research_access?`<details><summary>Telemetry & false-positive context</summary><p><strong>${esc(rule.log_source)}</strong><br>${esc(rule.false_positives)}</p></details>`:''}<footer>${badge(rule.severity)}<button class="text-button" data-rule-cases="${esc(rule.id)}">${rule.matches} matching cases ${icon('arrow',12)}</button></footer></article>`).join('')}</div>`;
 }
 
 function bindPage() {
@@ -300,7 +303,7 @@ function openPalette() {
   const input=dialog.querySelector('input');
   function results() {
     const query=input.value.toLowerCase();
-    const destinations=[...pages,{path:'/rules',label:'Detection library',icon:'shield'}].filter(p=>p.label.toLowerCase().includes(query));
+    const destinations=[...visiblePages(),{path:'/rules',label:'Detection library',icon:'shield'}].filter(p=>p.label.toLowerCase().includes(query));
     const incidents=data.incidents.filter(item=>`${item.title} ${item.actor} ${item.host} ${item.id}`.toLowerCase().includes(query)).slice(0,5);
     const users=data.snapshot.users.filter(user=>`${user.name} ${user.role}`.toLowerCase().includes(query)).slice(0,3);
     dialog.querySelector('#command-results').innerHTML=`${destinations.length?'<div class="command-group">Workspace</div>':''}${destinations.map(page=>`<button class="command-option" data-route="${page.path}">${icon(page.icon,15)}<span>${page.label}</span><span class="option-meta">Go to</span></button>`).join('')}${query&&incidents.length?'<div class="command-group">Investigations</div>':''}${query?incidents.map(item=>`<button class="command-option" data-open-case="${esc(item.id)}">${icon('shield',15)}<span>${esc(short(item.title,44))}</span><span class="option-meta">${esc(item.actor)}</span></button>`).join(''):''}${query&&users.length?'<div class="command-group">Identities</div>':''}${query?users.map(user=>`<button class="command-option" data-action="identity">${icon('user',15)}<span>${esc(user.name)}</span><span class="option-meta">${esc(short(user.role,24))}</span></button>`).join(''):''}`;
@@ -330,7 +333,14 @@ async function openIncident(id) {
     <div class="investigation-body"><section class="evidence-pane"><div class="pane-heading"><h3>Follow the evidence</h3><span class="mono muted" style="font-size:9px">${info.events.length} EVENTS</span></div><p class="evidence-intro">${esc(incident.summary)} Related events are correlated by source, run, and a bounded time window.</p><div id="incident-timeline">${timeline(info.events,matching)}</div>${incident.findings.length?`<div class="report-label">Linked access context</div>${incident.findings.map(finding=>`<div class="linked-access"><strong>${esc(finding.user_name)} · ${esc(title(finding.right))}</strong><p>${esc(finding.reason)}</p><span class="mono">${esc(finding.path.join(' → '))}</span></div>`).join('')}`:''}</section>
     <section class="analyst-pane"><div class="pane-heading"><h3>${iconInline('spark')}Analyst workspace</h3><span class="badge badge-outline">Evidence-backed</span></div><div id="report-content">${reportHTML(info.report || info.brief)}</div><div id="report-message" data-form-message></div><div class="report-tools"><button class="btn btn-primary btn-small" data-action="generate-report">${icon('spark',12)}Generate AI report</button><button class="btn btn-small" data-action="save-brief">${icon('file',12)}Save local brief</button>${info.report?'<button class="btn btn-small" data-action="export-report">'+icon('download',12)+'Export</button>':''}</div><p class="ai-disclosure">${data.ai.engine==='worker'?'<span class="badge badge-outline" data-worker-status role="status">'+(data.ai.worker?.online?'Project worker online':'Project worker offline')+'</span><br>':''}Our model analyses selected normalized incident evidence and permission context. Raw logs and ground-truth labels are omitted.</p></section></div>
     <footer class="investigation-footer"><span>Priority ${incident.priority}/100 · deterministic ranking, not probability</span><div class="actions"><button class="btn btn-small" data-action="review-case">${icon('check',12)}Record verdict</button><button class="btn btn-small" data-action="copy-bundle">${icon('copy',12)}Copy evidence</button></div></footer>`,'investigation-dialog');
-  if(!data.ai.configured || data.ai.provider==='local') dialog.querySelector('[data-action="generate-report"]').disabled=true;
+  if(!data.ai.configured || localBriefMode()) dialog.querySelector('[data-action="generate-report"]').disabled=true;
+  if(!data.research_access) {
+    dialog.querySelector('.incident-meta .badge').textContent='Incident evidence';
+    dialog.querySelector('.evidence-intro').textContent=incident.summary+' The timeline contains the evidence linked to this investigation.';
+    dialog.querySelector('[data-action="copy-bundle"]').remove();
+    dialog.querySelector('[data-action="review-case"]').remove();
+    if(incident.rule_id.startsWith('ML-')) dialog.querySelector('[data-action="generate-report"]').remove();
+  }
   const analystPane=dialog.querySelector('.analyst-pane');
   analystPane.querySelector('.pane-heading').after(analystPane.querySelector('.report-tools'));
   analystPane.querySelector('.report-tools').after(analystPane.querySelector('.ai-disclosure'));
@@ -352,7 +362,7 @@ async function generateReport(provider) {
   button.disabled=true;button.innerHTML='<span class="loading-dots"><i></i><i></i><i></i></span>'+ (provider==='local'?'Saving brief':'Reading the evidence');
   dialog.querySelector('#report-message').replaceChildren();
   try {
-    const result=await api(`/api/incidents/${encodeURIComponent(id)}/report`,{method:'POST',body:{provider:provider==='local'?'local':data.ai.provider}});
+    const result=await api(`/api/incidents/${encodeURIComponent(id)}/report`,{method:'POST',body:provider==='local'?{provider:'local'}:{}});
     const report=await waitForReport(result,dialog,button);
     if(!report) return;
     if(!dialog.isConnected || activeIncident?.incident.id!==id) return;
@@ -455,7 +465,7 @@ async function importSnapshot() {
 }
 
 function settingsDialog() {
-  const dialog=modal(`${modalHeader('A considered setup.','Credentials stay on the Go server.')}<div class="modal-body"><div class="form-field"><label for="analyst-name">Your reviewer name</label><input class="input" id="analyst-name" value="${esc(analystName)}"></div><dl><div class="key-value"><dt>Model</dt><dd>Our model</dd></div><div class="key-value"><dt>Generation</dt><dd>${data.ai.engine==='worker'?'Project terminal · OpenCode':data.ai.remote?'Managed model service':'Local model'}</dd></div><div class="key-value"><dt>Connection</dt><dd>${data.ai.engine==='worker'?'<span data-worker-status>'+(data.ai.worker?.online?'Project worker online':'Project worker offline')+'</span>':data.ai.configured?'Configured':'Not configured'}</dd></div><div class="key-value"><dt>Kaggle</dt><dd>${data.kaggle_configured?'Connected':'Not configured'}</dd></div></dl><p class="muted" style="font-size:11px;line-height:1.8">Our model uses selected normalized incident evidence and permission context. Raw logs and ground-truth labels are omitted. Local evidence briefs work offline.</p><div data-form-message></div></div><footer class="modal-footer"><button class="btn" id="check-provider">${icon('activity',12)}Check connection</button><button class="btn btn-primary" id="save-settings">Save preferences</button></footer>`);
+  const dialog=modal(`${modalHeader('A considered setup.','Credentials stay on the Go server.')}<div class="modal-body"><div class="form-field"><label for="analyst-name">Your reviewer name</label><input class="input" id="analyst-name" value="${esc(analystName)}"></div><dl><div class="key-value"><dt>Model</dt><dd>Our model</dd></div><div class="key-value"><dt>Generation</dt><dd>${data.ai.remote?'Managed model service':'Local mode'}</dd></div><div class="key-value"><dt>Connection</dt><dd>${data.ai.engine==='worker'?'<span data-worker-status>'+(data.ai.worker?.online?'Project worker online':'Project worker offline')+'</span>':data.ai.configured?'Configured':'Not configured'}</dd></div>${data.research_access?`<div class="key-value"><dt>Kaggle</dt><dd>${data.kaggle_configured?'Connected':'Not configured'}</dd></div>`:''}</dl><p class="muted" style="font-size:11px;line-height:1.8">Our model uses selected incident evidence and permission context. Local evidence briefs work offline.</p><div data-form-message></div></div><footer class="modal-footer"><button class="btn" id="check-provider">${icon('activity',12)}Check connection</button><button class="btn btn-primary" id="save-settings">Save preferences</button></footer>`);
   dialog.querySelector('#save-settings').addEventListener('click',()=>{analystName=dialog.querySelector('#analyst-name').value.trim()||'analyst';try{localStorage.setItem('identityshield-analyst',analystName);}catch{}closeModal();toast('Reviewer preferences saved.');});
   dialog.querySelector('#check-provider').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const result=await api('/api/ai/check',{method:'POST'});dialog.querySelector('[data-form-message]').innerHTML=`<div class="inline-success">${result.engine==='worker'?'Report worker connected.':'Our model is connected.'}</div>`;}catch(error){inlineError(dialog,error);}finally{button.disabled=false;}});
 }
@@ -472,8 +482,9 @@ async function inspectEvent(id) {
   if(!inspectedEvent){const result=await api(`/api/events?q=${encodeURIComponent(id)}`);inspectedEvent=result.events.find(event=>event.id===id);}
   if(!inspectedEvent) throw new Error('Evidence record not found.');
   const event=inspectedEvent;
-  const dialog=modal(`${modalHeader('An original record.',esc(event.id))}<div class="modal-body"><dl>${[['Observed',new Date(event.timestamp).toISOString()],['Actor',event.actor],['Host',event.host],['Kind',event.kind],['Label',event.label],['Source',event.source],['Run / day',event.run_id],['Raw SHA',event.raw_sha256]].map(([key,value])=>`<div class="key-value"><dt>${key}</dt><dd class="mono">${esc(value||'—')}</dd></div>`).join('')}</dl><pre class="code-block">${esc(JSON.stringify(event.data,null,2))}</pre><details><summary class="muted" style="font-size:11px;cursor:pointer">Preserved raw evidence</summary><pre class="code-block">${esc(event.raw||'No original raw payload was supplied.')}</pre></details></div><footer class="modal-footer"><button class="btn" data-close>Close</button><button class="btn" id="copy-record">${icon('copy',12)}Copy record</button><button class="btn btn-primary" data-action="label-event">Review label</button></footer>`);
-  dialog.querySelector('#copy-record').addEventListener('click',()=>copy(JSON.stringify(event,null,2)));
+  const fields=[['Observed',new Date(event.timestamp).toISOString()],['Actor',event.actor],['Host',event.host],['Kind',event.kind],...(data.research_access?[['Label',event.label],['Source',event.source],['Run / day',event.run_id],['Raw SHA',event.raw_sha256]]:[])];
+  const dialog=modal(`${modalHeader('An incident record.',esc(event.id))}<div class="modal-body"><dl>${fields.map(([key,value])=>`<div class="key-value"><dt>${key}</dt><dd class="mono">${esc(value||'—')}</dd></div>`).join('')}</dl><pre class="code-block">${esc(JSON.stringify(event.data,null,2))}</pre>${data.research_access?`<details><summary class="muted" style="font-size:11px;cursor:pointer">Preserved raw evidence</summary><pre class="code-block">${esc(event.raw||'No original raw payload was supplied.')}</pre></details>`:''}</div><footer class="modal-footer"><button class="btn" data-close>Close</button>${data.research_access?`<button class="btn" id="copy-record">${icon('copy',12)}Copy record</button><button class="btn btn-primary" data-action="label-event">Review label</button>`:''}</footer>`);
+  dialog.querySelector('#copy-record')?.addEventListener('click',()=>copy(JSON.stringify(event,null,2)));
 }
 function labelEvent() {
   const event=inspectedEvent;

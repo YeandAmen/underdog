@@ -20,7 +20,7 @@ import (
 
 func queuedWorkspace(t *testing.T) (*server.Server, *httptest.Server, config.Config, string) {
 	t.Helper()
-	cfg := config.Config{Addr: "127.0.0.1:8787", DataDir: t.TempDir(), AIProvider: "agentrouter", AIBackend: "worker", AIModel: "gpt-6.1-sol", AIBaseURL: "https://agentrouter.org/v1", PublicAccess: true, WorkerToken: "private-worker-token", AIKey: "private-model-key"}
+	cfg := config.Config{Addr: "127.0.0.1:8787", DataDir: t.TempDir(), AIProvider: "agentrouter", AIBackend: "worker", AIModel: "gpt-6.1-sol", AIBaseURL: "https://agentrouter.org/v1", PublicAccess: true, AccessToken: "private-owner-token", WorkerToken: "private-worker-token", AIKey: "private-model-key"}
 	app, err := server.New(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -151,6 +151,7 @@ func TestWorkerCannotPublishInventedCitationsOrChangedEvidence(t *testing.T) {
 					// The API review updates evidence and invalidates the local cache.
 					request, _ := http.NewRequest(http.MethodPost, host.URL+"/api/events/"+citation+"/label", strings.NewReader(`{"label":"benign","reviewer":"reviewer","reason":"Independent review"}`))
 					request.Header.Set("Content-Type", "application/json")
+					request.Header.Set("Authorization", "Bearer "+cfg.AccessToken)
 					response, err := http.DefaultClient.Do(request)
 					if err != nil {
 						t.Fatal(err)

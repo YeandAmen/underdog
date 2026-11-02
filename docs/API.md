@@ -8,6 +8,12 @@ are rejected. API keys for model/Kaggle providers are never returned.
 The production demo has `IDENTITYSHIELD_PUBLIC_ACCESS=true`, so the browser and
 API open without a workspace token. Private deployments keep this setting false.
 
+Dataset libraries, source metadata, research results, raw records, model weights,
+bulk downloads, training, and lab controls require the owner's workspace token
+even when the office demo is public. Anonymous workspace responses contain
+office views and bounded incident evidence only. Public citations use stable
+event aliases; raw identifiers and truth labels are retained in the private view.
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/health` | Version, health, workspace-token requirement |

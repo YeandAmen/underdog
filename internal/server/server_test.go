@@ -83,6 +83,7 @@ func TestPublicWorkspaceOpensWithoutATokenAndRejectsCrossOriginWrites(t *testing
 	}
 	for _, origin := range []string{httpServer.URL, "https://unrelated.example"} {
 		request, _ := http.NewRequest(http.MethodPost, httpServer.URL+"/api/rules/IS-001", bytes.NewBufferString(`{"enabled":false}`))
+		request.Header.Set("Authorization", "Bearer owner-token-not-for-the-browser")
 		request.Header.Set("Origin", origin)
 		response, err := http.DefaultClient.Do(request)
 		if err != nil {

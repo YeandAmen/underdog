@@ -60,7 +60,8 @@ Whole-run/day model boundaries and existing reviewer labels remain intact.
 
 Production is a public interactive demo and opens without a Vercel login or
 workspace-token prompt. `IDENTITYSHIELD_PUBLIC_ACCESS=true` explicitly disables
-the app's token gate; model/Kaggle credentials remain server-side. Vercel
+the public office-view token gate. Research, source data, raw records, training,
+and bulk downloads still require the owner token. Model/Kaggle credentials remain server-side. Vercel
 authentication protects previews only. For a private deployment, set public
 access to `false` and use the workspace bearer token.
 

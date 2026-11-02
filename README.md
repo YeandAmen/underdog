@@ -25,12 +25,10 @@ understand possible threats, and decide what to review next.
 - **Investigations** that keep an alert and its supporting records together.
 - **AI reports** that explain the findings and link back to the evidence.
 - **Team reviews** for saving decisions, adding notes and downloading reports.
-- **Log imports** so teams can review their own activity records.
-- **A practice lab** for exploring threats with sample data.
 - **A Go terminal with OpenCode** built into the project for AI work.
 - **A responsive workspace** with search, live updates, and light and dark themes.
 
-Try the demo with sample data, or import your own logs.
+Open the demo to review office accounts, access paths and investigations.
 
 ## Run locally
 
@@ -53,8 +51,6 @@ go run ./cmd/underdog terminal
 
 - [Model and deployment setup](docs/VERCEL.md)
 - [AI worker setup](docs/WORKER.md)
-- [Importing data](docs/DATASETS.md)
-- [Practice lab](lab/README.md)
 
 ## Licence
 

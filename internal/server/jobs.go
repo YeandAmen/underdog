@@ -72,7 +72,7 @@ func (s *Server) enqueueReport(w http.ResponseWriter, r *http.Request, incident 
 		problem(w, http.StatusInternalServerError, "Could not queue the report")
 		return
 	}
-	respond(w, http.StatusAccepted, map[string]any{"job": job})
+	respond(w, http.StatusAccepted, map[string]any{"job": s.presentedJob(r, job)})
 }
 
 func (s *Server) claimReport(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +160,7 @@ func (s *Server) reportJob(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusNotFound, "Report job not found")
 		return
 	}
-	response := map[string]any{"job": job, "worker": s.Store.WorkerStatus(r.Context())}
+	response := map[string]any{"job": s.presentedJob(r, job), "worker": s.Store.WorkerStatus(r.Context())}
 	if job.Status == "succeeded" {
 		incident, events, err := s.investigation(r.Context(), job.IncidentID)
 		if err != nil || incident.EvidenceHash != job.EvidenceHash {
@@ -172,7 +172,7 @@ func (s *Server) reportJob(w http.ResponseWriter, r *http.Request) {
 			problem(w, http.StatusInternalServerError, "The validated report could not be loaded")
 			return
 		}
-		response["report"] = report
+		response["report"] = s.presentedReport(r, report, events)
 	}
 	respond(w, http.StatusOK, response)
 }
