@@ -4,18 +4,18 @@
 
 [Open Underdog](https://underdog-fyield1.vercel.app)
 
-## Why we built it
+## Why i built it
 
-We built Sinnogram to make organising locations in Abuja easier. With Underdog,
-we brought that same approach to office cybersecurity.
+I built Sinnogram to make organising locations in Abuja easier. With Underdog,
+i brought that same approach to office cybersecurity.
 
 Office teams need to know who has access, what looks suspicious, and what needs
 attention. That information is often scattered across accounts, logs and alerts.
 
-Underdog brings it together. We built it to help teams spot access problems,
+Underdog brings it together. I built it to help teams spot access problems,
 understand possible threats, and decide what to review next.
 
-## What we built
+## What i built
 
 - **One overview** for office accounts, alerts and access issues.
 - **Access checks** that show who can reach important systems and where access
