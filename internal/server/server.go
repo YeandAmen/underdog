@@ -21,16 +21,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/analyst"
-	"github.com/YeandAmen/identityshield/internal/config"
-	"github.com/YeandAmen/identityshield/internal/datasets"
-	"github.com/YeandAmen/identityshield/internal/detection"
-	"github.com/YeandAmen/identityshield/internal/domain"
-	"github.com/YeandAmen/identityshield/internal/identity"
-	"github.com/YeandAmen/identityshield/internal/lab"
-	"github.com/YeandAmen/identityshield/internal/research"
-	"github.com/YeandAmen/identityshield/internal/store"
-	"github.com/YeandAmen/identityshield/web"
+	"github.com/YeandAmen/underdog/internal/analyst"
+	"github.com/YeandAmen/underdog/internal/config"
+	"github.com/YeandAmen/underdog/internal/datasets"
+	"github.com/YeandAmen/underdog/internal/detection"
+	"github.com/YeandAmen/underdog/internal/domain"
+	"github.com/YeandAmen/underdog/internal/identity"
+	"github.com/YeandAmen/underdog/internal/lab"
+	"github.com/YeandAmen/underdog/internal/research"
+	"github.com/YeandAmen/underdog/internal/store"
+	"github.com/YeandAmen/underdog/web"
 )
 
 type Server struct {
@@ -159,6 +159,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/datasets/kaggle/files", s.kaggleFiles)
 	mux.HandleFunc("POST /api/research/train", s.train)
 	mux.HandleFunc("POST /api/ai/check", s.checkAI)
+	s.workerRoutes(mux)
 	mux.HandleFunc("GET /api/export/events", s.exportEvents)
 	mux.HandleFunc("GET /api/export/report/{id}", s.exportReport)
 	mux.HandleFunc("GET /api/export/model/{domain}", s.exportModel)
@@ -185,7 +186,8 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
-			if r.URL.Path != "/api/health" && s.Config.AccessToken != "" {
+			workerRequest := r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/ai/worker/")
+			if r.URL.Path != "/api/health" && !workerRequest && s.Config.AccessToken != "" && !s.Config.PublicAccess {
 				token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 				if subtle.ConstantTimeCompare([]byte(token), []byte(s.Config.AccessToken)) != 1 {
 					problem(w, http.StatusUnauthorized, "Workspace access token required")
@@ -304,7 +306,7 @@ func (s *Server) loadFresh(ctx context.Context) ([]domain.Event, domain.Snapshot
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	respond(w, http.StatusOK, map[string]any{"status": "ok", "name": "IdentityShield", "version": "0.1.0", "requires_token": s.Config.AccessToken != ""})
+	respond(w, http.StatusOK, map[string]any{"status": "ok", "name": "Underdog", "version": "0.1.0", "requires_token": s.Config.AccessToken != "" && !s.Config.PublicAccess, "public_access": s.Config.PublicAccess, "model_engine": s.Config.AIBackend})
 }
 
 func (s *Server) state(w http.ResponseWriter, r *http.Request) {
@@ -415,7 +417,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		"incidents": incidents, "rules": rules, "datasets": imports, "catalog": datasets.Catalog(),
 		"models": models, "counts": counts, "series": series, "reviews": reviews,
 		"data_mode": dataMode, "now": now, "analysis_window_limit": 200000,
-		"ai":                map[string]any{"provider": s.Config.AIProvider, "model": s.Config.AIModel, "configured": s.Config.AIKey != "" || s.Config.AIProvider == "local" || s.Config.AIProvider == "ollama", "remote": s.Config.AIProvider == "agentrouter" || s.Config.AIProvider == "openrouter", "host": base.Host},
+		"ai":                map[string]any{"provider": s.Config.AIProvider, "model": s.Config.AIModel, "engine": s.Config.AIBackend, "configured": s.Config.AIKey != "" || s.Config.AIProvider == "local" || s.Config.AIProvider == "ollama" || s.Config.AIBackend == "worker" && s.Config.WorkerToken != "", "remote": s.Config.AIProvider == "agentrouter" || s.Config.AIProvider == "openrouter", "host": base.Host, "worker": s.Store.WorkerStatus(r.Context())},
 		"kaggle_configured": s.Config.KaggleToken != "" || (s.Config.KaggleUsername != "" && s.Config.KaggleKey != ""),
 		"scenarios":         lab.ScenarioNames(),
 	})
@@ -508,6 +510,18 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 		client = analyst.New(cfg)
 	} else if input.Provider != "" && input.Provider != s.Config.AIProvider {
 		problem(w, http.StatusBadRequest, "Requested provider is not configured")
+		return
+	}
+	if s.Config.PublicAccess || s.Config.AIBackend == "worker" {
+		if existing, err := s.Store.Report(r.Context(), incident.ID); err == nil && existing.EvidenceHash == incident.EvidenceHash && existing.Provider == client.Config.AIProvider && existing.Model == client.Config.AIModel {
+			if err := analyst.Validate(existing, events); err == nil {
+				respond(w, http.StatusOK, existing)
+				return
+			}
+		}
+	}
+	if s.Config.AIBackend == "worker" && client.Config.AIProvider != "local" {
+		s.enqueueReport(w, r, incident)
 		return
 	}
 	report, err := client.Report(r.Context(), incident, events)
@@ -990,6 +1004,14 @@ func (s *Server) train(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) checkAI(w http.ResponseWriter, r *http.Request) {
+	if s.Config.AIBackend == "worker" {
+		if !s.Store.WorkerStatus(r.Context()).Online {
+			problem(w, http.StatusServiceUnavailable, "Our model worker is offline. Reconnect the project terminal to generate reports.")
+			return
+		}
+		respond(w, http.StatusOK, map[string]any{"provider": s.Config.AIProvider, "model": s.Config.AIModel, "engine": "worker"})
+		return
+	}
 	if err := s.Analyst.Check(r.Context()); err != nil {
 		_ = s.Store.Put(r.Context(), "ai_health", map[string]any{"connected": false, "checked_at": time.Now().UTC(), "error": err.Error()})
 		problem(w, http.StatusBadGateway, err.Error())

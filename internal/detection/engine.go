@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
-	"github.com/YeandAmen/identityshield/internal/identity"
+	"github.com/YeandAmen/underdog/internal/domain"
+	"github.com/YeandAmen/underdog/internal/identity"
 )
 
 func Rules() []domain.Rule {

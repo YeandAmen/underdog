@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/YeandAmen/identityshield/internal/datasets"
+	"github.com/YeandAmen/underdog/internal/datasets"
 )
 
 func TestPublisherHAISemicolonCSVAndRawRecordPreservation(t *testing.T) {

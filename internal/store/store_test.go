@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
-	"github.com/YeandAmen/identityshield/internal/store"
+	"github.com/YeandAmen/underdog/internal/domain"
+	"github.com/YeandAmen/underdog/internal/store"
 )
 
 func TestImportRollbackDeduplicationAndLabelProvenance(t *testing.T) {

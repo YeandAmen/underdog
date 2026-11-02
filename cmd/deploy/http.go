@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/store"
+	"github.com/YeandAmen/underdog/internal/store"
 )
 
 func neonSQL(ctx context.Context, databaseURL, query string, params []any) error {

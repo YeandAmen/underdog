@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
+	"github.com/YeandAmen/underdog/internal/domain"
 )
 
 var SupportedRights = map[string]bool{

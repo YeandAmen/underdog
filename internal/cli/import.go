@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/config"
+	"github.com/YeandAmen/underdog/internal/config"
 )
 
 func upload(cfg config.Config, filename, format, source string, data []byte) error {
@@ -40,7 +40,7 @@ func upload(cfg config.Config, filename, format, source string, data []byte) err
 	}
 	response, err := (&http.Client{Timeout: 120 * time.Second}).Do(request)
 	if err != nil {
-		return fmt.Errorf("start the IdentityShield server before importing: %w", err)
+		return fmt.Errorf("start the Underdog server before importing: %w", err)
 	}
 	defer response.Body.Close()
 	result, err := io.ReadAll(io.LimitReader(response.Body, 2<<20))

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
+	"github.com/YeandAmen/underdog/internal/domain"
 )
 
 type Sample struct {

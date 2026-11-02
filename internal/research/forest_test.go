@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
-	"github.com/YeandAmen/identityshield/internal/lab"
-	"github.com/YeandAmen/identityshield/internal/research"
+	"github.com/YeandAmen/underdog/internal/domain"
+	"github.com/YeandAmen/underdog/internal/lab"
+	"github.com/YeandAmen/underdog/internal/research"
 )
 
 func TestGroupHoldoutAndNoTestLabelLeakage(t *testing.T) {

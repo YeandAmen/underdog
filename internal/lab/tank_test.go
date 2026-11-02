@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/lab"
+	"github.com/YeandAmen/underdog/internal/lab"
 )
 
 func TestTankConservationAndControlledManipulation(t *testing.T) {

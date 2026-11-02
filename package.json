@@ -1,10 +1,16 @@
 {
-  "name": "identityshield-browser-checks",
+  "name": "underdog",
   "private": true,
   "type": "module",
   "scripts": {
     "check:ui": "node --check web/assets/app.js",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "terminal": "go run ./cmd/underdog terminal",
+    "opencode": "go run ./cmd/underdog opencode",
+    "worker": "go run ./cmd/underdog worker"
+  },
+  "dependencies": {
+    "opencode-ai": "1.19.5"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

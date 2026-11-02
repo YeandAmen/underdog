@@ -1,4 +1,4 @@
-module github.com/YeandAmen/identityshield
+module github.com/YeandAmen/underdog
 
 go 1.26.0
 

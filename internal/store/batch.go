@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
+	"github.com/YeandAmen/underdog/internal/domain"
 )
 
 func (s *Store) importPostgres(ctx context.Context, dataset domain.Dataset, events []domain.Event) (domain.Dataset, error) {

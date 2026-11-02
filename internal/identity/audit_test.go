@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
-	"github.com/YeandAmen/identityshield/internal/identity"
-	"github.com/YeandAmen/identityshield/internal/lab"
+	"github.com/YeandAmen/underdog/internal/domain"
+	"github.com/YeandAmen/underdog/internal/identity"
+	"github.com/YeandAmen/underdog/internal/lab"
 )
 
 func TestNestedMembershipCycleTerminates(t *testing.T) {

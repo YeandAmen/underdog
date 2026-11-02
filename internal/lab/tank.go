@@ -6,7 +6,7 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
+	"github.com/YeandAmen/underdog/internal/domain"
 )
 
 // Tank is a deliberately small process model, not a digital twin of a plant.

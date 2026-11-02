@@ -42,7 +42,6 @@ const title = value => String(value || '').replaceAll('_', ' ').replaceAll('-', 
 const short = (value, max = 26) => String(value).length > max ? String(value).slice(0, max - 1) + '…' : String(value);
 const date = value => new Date(value).toLocaleDateString('en', {month:'short',day:'numeric'});
 const utc = value => new Date(value).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',timeZone:'UTC'});
-const providerName = value => value==='openrouter'?'OpenRouter':value==='agentrouter'?'Agent Router':value==='ollama'?'Ollama':'Local';
 function ago(value) {
   const seconds = Math.max(0, (Date.now() - new Date(value)) / 1000);
   if (seconds < 60) return 'just now';
@@ -109,12 +108,13 @@ async function load(quiet = false) {
 function updateConnection() {
   const element = document.querySelector('#connection');
   if (element) element.innerHTML = `<span class="dot ${online ? 'live-dot' : 'danger'}"></span><span>${online ? 'Workspace connected' : 'Workspace offline'}</span>`;
+  document.querySelectorAll('[data-worker-status]').forEach(element=>{element.textContent=data?.ai.worker?.online?'Project worker online':'Project worker offline';});
 }
 
 function renderShell() {
   document.querySelector('#app').innerHTML = `
     <header class="topbar"><div class="topbar-inner">
-      <a href="/" class="brand" data-route="/" aria-label="IdentityShield overview"><span class="brand-mark">${icon('shield',20)}</span>IdentityShield</a>
+      <a href="/" class="brand" data-route="/" aria-label="Underdog overview"><span class="brand-mark">${icon('shield',20)}</span>Underdog</a>
       <nav class="topnav" aria-label="Workspace navigation">${pages.map(page => `<a class="nav-link" href="${page.path}" data-route="${page.path}">${page.label}</a>`).join('')}</nav>
       <div class="top-tools">
         <button class="search-trigger" data-action="search" aria-label="Search workspace"><span>${icon('search',14)}</span><span>Search</span><kbd>⌘ K</kbd></button>
@@ -125,7 +125,7 @@ function renderShell() {
     <div class="workspace">
       <div class="workspace-line"><div class="breadcrumb">${icon('building',13)}<span id="organization">${esc(data.organization)}</span><span class="slash">/</span><span class="workspace-label">Security workspace</span></div><div class="connection" id="connection"></div></div>
       <main id="main" tabindex="-1"></main>
-      <footer class="footer"><span>Built in Go. Grounded in evidence.</span><div class="footer-links"><a href="/rules" data-route="/rules">Detection library ${iconInline('external')}</a><a href="https://github.com/YeandAmen/identityshield" target="_blank" rel="noreferrer">Source ${iconInline('external')}</a><span class="mono">v0.1.0</span></div></footer>
+      <footer class="footer"><span>Built in Go. Grounded in evidence.</span><div class="footer-links"><a href="/rules" data-route="/rules">Detection library ${iconInline('external')}</a><a href="https://github.com/YeandAmen/underdog" target="_blank" rel="noreferrer">Source ${iconInline('external')}</a><span class="mono">v0.1.0</span></div></footer>
     </div>`;
   updateConnection();
 }
@@ -143,7 +143,7 @@ function renderPage() {
   const views = {'/':overview,'/investigations':investigations,'/identity':identityPage,'/datasets':datasetsPage,'/research':researchPage,'/rules':rulesPage};
   document.querySelector('#main').innerHTML = `<div class="view">${(views[route] || overview)()}</div>`;
   bindPage();
-  document.title = `IdentityShield — ${pages.find(p => p.path === route)?.label || 'Detection library'}`;
+  document.title = `Underdog — ${pages.find(p => p.path === route)?.label || 'Detection library'}`;
 }
 
 function navigate(path) {
@@ -296,7 +296,7 @@ function toast(message, error=false) {
 function inlineError(dialog,error) {const element=dialog.querySelector('[data-form-message]');if(element) element.innerHTML=`<div class="inline-error" role="alert">${esc(error.message || error)}</div>`;else toast(error.message || error,true);}
 
 function openPalette() {
-  const dialog=modal(`<div class="command-search">${icon('search',18)}<input id="command-input" placeholder="Where would you like to go?" aria-label="Search workspace commands" autocomplete="off"><kbd>esc</kbd></div><div class="command-results" id="command-results"></div><div class="command-help"><span>↑ ↓ navigate · ↵ open</span><span>IdentityShield workspace</span></div>`,'command-dialog');
+  const dialog=modal(`<div class="command-search">${icon('search',18)}<input id="command-input" placeholder="Where would you like to go?" aria-label="Search workspace commands" autocomplete="off"><kbd>esc</kbd></div><div class="command-results" id="command-results"></div><div class="command-help"><span>↑ ↓ navigate · ↵ open</span><span>Underdog workspace</span></div>`,'command-dialog');
   const input=dialog.querySelector('input');
   function results() {
     const query=input.value.toLowerCase();
@@ -328,7 +328,7 @@ async function openIncident(id) {
   const synthetic=info.events.every(event=>event.source==='synthetic-lab');
   const dialog=modal(`<header class="investigation-header"><div class="case-id-row"><span class="case-id">${icon('shield',13)}${esc(incident.id)}<span class="slash">/</span>${esc(incident.rule_id)}${badge(incident.severity)}</span><button class="icon-button" data-close aria-label="Close investigation">${icon('close',18)}</button></div><h2>${esc(incident.title)}</h2><div class="incident-meta"><span>${icon('user',12)}${esc(incident.actor)}</span><span>${icon('server',12)}${esc(incident.host)}</span><span>${icon('clock',12)}${date(incident.started_at)} · ${utc(incident.started_at)} UTC</span><span class="badge badge-outline">${synthetic?'Synthetic lab evidence':'Imported evidence'}</span></div></header>
     <div class="investigation-body"><section class="evidence-pane"><div class="pane-heading"><h3>Follow the evidence</h3><span class="mono muted" style="font-size:9px">${info.events.length} EVENTS</span></div><p class="evidence-intro">${esc(incident.summary)} Related events are correlated by source, run, and a bounded time window.</p><div id="incident-timeline">${timeline(info.events,matching)}</div>${incident.findings.length?`<div class="report-label">Linked access context</div>${incident.findings.map(finding=>`<div class="linked-access"><strong>${esc(finding.user_name)} · ${esc(title(finding.right))}</strong><p>${esc(finding.reason)}</p><span class="mono">${esc(finding.path.join(' → '))}</span></div>`).join('')}`:''}</section>
-    <section class="analyst-pane"><div class="pane-heading"><h3>${iconInline('spark')}Analyst workspace</h3><span class="badge badge-outline">Evidence-backed</span></div><div id="report-content">${reportHTML(info.report || info.brief)}</div><div id="report-message" data-form-message></div><div class="report-tools"><button class="btn btn-primary btn-small" data-action="generate-report">${icon('spark',12)}Generate AI report</button><button class="btn btn-small" data-action="save-brief">${icon('file',12)}Save local brief</button>${info.report?'<button class="btn btn-small" data-action="export-report">'+icon('download',12)+'Export</button>':''}</div><p class="ai-disclosure">${data.ai.remote?providerName(data.ai.provider)+' sends only the selected normalized incident evidence and permission context to '+esc(data.ai.model)+'. Raw logs and truth labels are omitted.':'Configured mode: '+esc(data.ai.provider)+'. Local evidence briefs require no model connection.'}</p></section></div>
+    <section class="analyst-pane"><div class="pane-heading"><h3>${iconInline('spark')}Analyst workspace</h3><span class="badge badge-outline">Evidence-backed</span></div><div id="report-content">${reportHTML(info.report || info.brief)}</div><div id="report-message" data-form-message></div><div class="report-tools"><button class="btn btn-primary btn-small" data-action="generate-report">${icon('spark',12)}Generate AI report</button><button class="btn btn-small" data-action="save-brief">${icon('file',12)}Save local brief</button>${info.report?'<button class="btn btn-small" data-action="export-report">'+icon('download',12)+'Export</button>':''}</div><p class="ai-disclosure">${data.ai.engine==='worker'?'<span class="badge badge-outline" data-worker-status role="status">'+(data.ai.worker?.online?'Project worker online':'Project worker offline')+'</span><br>':''}Our model analyses selected normalized incident evidence and permission context. Raw logs and ground-truth labels are omitted.</p></section></div>
     <footer class="investigation-footer"><span>Priority ${incident.priority}/100 · deterministic ranking, not probability</span><div class="actions"><button class="btn btn-small" data-action="review-case">${icon('check',12)}Record verdict</button><button class="btn btn-small" data-action="copy-bundle">${icon('copy',12)}Copy evidence</button></div></footer>`,'investigation-dialog');
   if(!data.ai.configured || data.ai.provider==='local') dialog.querySelector('[data-action="generate-report"]').disabled=true;
   const analystPane=dialog.querySelector('.analyst-pane');
@@ -340,7 +340,7 @@ function timeline(events,matching) {
   return events.map(event=>`<article class="timeline-item ${matching.has(event.id)?'rule-match':''}" data-event-id="${esc(event.id)}"><time>${utc(event.timestamp)}:${new Date(event.timestamp).getUTCSeconds().toString().padStart(2,'0')} UTC</time><h4>${esc(title(event.kind))} ${matching.has(event.id)?'<span class="badge badge-outline" style="margin-left:4px">rule match</span>':''}</h4><p><code>${esc(event.actor)}</code> on <code>${esc(event.host)}</code>${event.target?` · target ${esc(event.target)}`:''}</p>${event.data.command?`<pre class="timeline-command">${esc(event.data.command)}</pre>`:''}${event.kind==='ics_sample'?`<p class="mono" style="margin-top:6px">${Object.entries(event.data).filter(([key])=>['tank_level','pressure','flow_rate'].includes(key)).map(([key,value])=>`${esc(key)}: ${esc(value)}`).join(' · ')}</p>`:''}<button class="event-link" data-event="${esc(event.id)}">${esc(event.id)} · inspect record ${iconInline('external')}</button></article>`).join('');
 }
 function reportHTML(report) {
-  return `<div class="report-status"><span class="dot"></span>${report.provider==='local'?'LOCAL EVIDENCE BRIEF':esc(report.provider).toUpperCase()+' · '+esc(report.model)}</div><p class="report-summary">${esc(report.summary)}</p><span class="badge ${report.verdict==='benign'?'good':'medium'}">Suggested verdict: ${esc(title(report.verdict))}</span><div class="report-label">Supported observations</div>${report.claims.map(claim=>`<div class="report-claim">${esc(claim.text)}<div class="citations">${claim.evidence_ids.map(id=>`<button class="citation" data-citation="${esc(id)}">${esc(short(id,24))}</button>`).join('')}</div></div>`).join('')}<div class="report-label">Next steps</div><ol class="report-steps">${report.next_steps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol><div class="report-limitations"><strong>Scope & limitations</strong><ul>${report.limitations.map(note=>`<li>${esc(note)}</li>`).join('')}</ul><span>Citation membership is checked. The meaning of each claim still requires analyst review.</span></div>`;
+  return `<div class="report-status"><span class="dot"></span>${report.provider==='local'?'LOCAL EVIDENCE BRIEF':'OUR MODEL · '+esc(report.model)}</div><p class="report-summary">${esc(report.summary)}</p><span class="badge ${report.verdict==='benign'?'good':'medium'}">Suggested verdict: ${esc(title(report.verdict))}</span><div class="report-label">Supported observations</div>${report.claims.map(claim=>`<div class="report-claim">${esc(claim.text)}<div class="citations">${claim.evidence_ids.map(id=>`<button class="citation" data-citation="${esc(id)}">${esc(short(id,24))}</button>`).join('')}</div></div>`).join('')}<div class="report-label">Next steps</div><ol class="report-steps">${report.next_steps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol><div class="report-limitations"><strong>Scope & limitations</strong><ul>${report.limitations.map(note=>`<li>${esc(note)}</li>`).join('')}</ul><span>Citation membership is checked. The meaning of each claim still requires analyst review.</span></div>`;
 }
 async function generateReport(provider) {
   if(!activeIncident) return;
@@ -352,14 +352,39 @@ async function generateReport(provider) {
   button.disabled=true;button.innerHTML='<span class="loading-dots"><i></i><i></i><i></i></span>'+ (provider==='local'?'Saving brief':'Reading the evidence');
   dialog.querySelector('#report-message').replaceChildren();
   try {
-    const report=await api(`/api/incidents/${encodeURIComponent(id)}/report`,{method:'POST',body:{provider:provider==='local'?'local':data.ai.provider}});
+    const result=await api(`/api/incidents/${encodeURIComponent(id)}/report`,{method:'POST',body:{provider:provider==='local'?'local':data.ai.provider}});
+    const report=await waitForReport(result,dialog,button);
+    if(!report) return;
     if(!dialog.isConnected || activeIncident?.incident.id!==id) return;
+    dialog.querySelector('#report-message').replaceChildren();
     activeIncident.report=report;
     dialog.querySelector('#report-content').innerHTML=reportHTML(report);
     if(!dialog.querySelector('[data-action="export-report"]')) dialog.querySelector('.report-tools').insertAdjacentHTML('beforeend','<button class="btn btn-small" data-action="export-report">'+icon('download',12)+'Export</button>');
     toast(provider==='local'?'Local evidence brief saved.':'Cited analyst report saved.');
   } catch(error) { if(dialog.isConnected) inlineError(dialog,error); }
   finally { if(button.isConnected) {button.disabled=false;button.innerHTML=label;} }
+}
+
+async function waitForReport(result,dialog,button) {
+  const deadline=Date.now()+10*60*1000;
+  while(result.job) {
+    if(!dialog.isConnected) return null;
+    const {job,worker}=result;
+    if(worker) {data.ai.worker=worker;updateConnection();}
+    if(job.status==='failed') throw new Error(job.error||'Our model could not complete this report. Please retry.');
+    if(job.status==='succeeded') {
+      if(!result.report) throw new Error('The saved report could not be loaded.');
+      return result.report;
+    }
+    if(Date.now()>deadline) throw new Error('The report is still queued. Reopen this investigation to check the saved result.');
+    const seconds=Math.max(0,Math.floor((Date.now()-new Date(job.created_at))/1000));
+    button.innerHTML='<span class="loading-dots"><i></i><i></i><i></i></span>'+(job.status==='queued'?'Queued for our model':'Reading the evidence');
+    dialog.querySelector('#report-message').textContent=(job.status==='queued'?'Waiting for the project worker':'Our model is analysing selected evidence')+` · ${seconds}s`;
+    await new Promise(resolve=>setTimeout(resolve,1500));
+    if(!dialog.isConnected) return null;
+    result=await api(`/api/report-jobs/${encodeURIComponent(job.id)}`,{signal:AbortSignal.timeout(20000)});
+  }
+  return result;
 }
 
 function reviewCase() {
@@ -430,23 +455,9 @@ async function importSnapshot() {
 }
 
 function settingsDialog() {
-  const dialog=modal(`${modalHeader('A considered setup.','The Go server owns credentials. The browser only sees configuration status.')}<div class="modal-body"><div class="form-field"><label for="analyst-name">Your reviewer name</label><input class="input" id="analyst-name" value="${esc(analystName)}"></div><dl><div class="key-value"><dt>Inference</dt><dd>${esc(data.ai.provider)} · <code>${esc(data.ai.model)}</code></dd></div><div class="key-value"><dt>Endpoint</dt><dd>${esc(data.ai.host)}</dd></div><div class="key-value"><dt>Credential</dt><dd>${data.ai.configured?'Configured; live validity is checked separately':'Not configured'}</dd></div><div class="key-value"><dt>Kaggle</dt><dd>${data.kaggle_configured?'Server credential configured':'Token not present'}</dd></div></dl><div class="code-block"># Set these in the ignored .env file, then restart:
-${data.ai.provider==='openrouter'?'OPENROUTER_API_KEY':'AGENT_ROUTER_API_KEY'}=&lt;your replacement key&gt;
-IDENTITYSHIELD_AI_PROVIDER=${esc(data.ai.provider)}
-IDENTITYSHIELD_AI_MODEL=${esc(data.ai.model)}
-IDENTITYSHIELD_AI_BASE_URL=${data.ai.provider==='openrouter'?'https://openrouter.ai/api/v1':'https://agentrouter.org/v1'}
-
-# OpenRouter alternative:
-IDENTITYSHIELD_AI_PROVIDER=openrouter
-IDENTITYSHIELD_AI_MODEL=openai/gpt-6.1-sol
-IDENTITYSHIELD_AI_BASE_URL=https://openrouter.ai/api/v1
-
-# Optional genuinely local inference:
-IDENTITYSHIELD_AI_PROVIDER=ollama
-IDENTITYSHIELD_AI_MODEL=qwen3:8b
-IDENTITYSHIELD_AI_BASE_URL=http://127.0.0.1:11434/v1</div><p class="muted" style="font-size:11px;line-height:1.8">OpenRouter and Agent Router use cloud inference. Selected incident evidence leaves this machine when you generate an AI report. Local evidence briefs are deterministic and work offline.</p><div data-form-message></div></div><footer class="modal-footer"><button class="btn" id="check-provider">${icon('activity',12)}Check connection</button><button class="btn btn-primary" id="save-settings">Save preferences</button></footer>`);
+  const dialog=modal(`${modalHeader('A considered setup.','Credentials stay on the Go server.')}<div class="modal-body"><div class="form-field"><label for="analyst-name">Your reviewer name</label><input class="input" id="analyst-name" value="${esc(analystName)}"></div><dl><div class="key-value"><dt>Our model</dt><dd><code>${esc(data.ai.model)}</code></dd></div><div class="key-value"><dt>Generation</dt><dd>${data.ai.engine==='worker'?'Project terminal · OpenCode':data.ai.remote?'Managed model service':'Local model'}</dd></div><div class="key-value"><dt>Connection</dt><dd>${data.ai.engine==='worker'?'<span data-worker-status>'+(data.ai.worker?.online?'Project worker online':'Project worker offline')+'</span>':data.ai.configured?'Configured':'Not configured'}</dd></div><div class="key-value"><dt>Kaggle</dt><dd>${data.kaggle_configured?'Connected':'Not configured'}</dd></div></dl><p class="muted" style="font-size:11px;line-height:1.8">Our model uses selected normalized incident evidence and permission context. Raw logs and ground-truth labels are omitted. Local evidence briefs work offline.</p><div data-form-message></div></div><footer class="modal-footer"><button class="btn" id="check-provider">${icon('activity',12)}Check connection</button><button class="btn btn-primary" id="save-settings">Save preferences</button></footer>`);
   dialog.querySelector('#save-settings').addEventListener('click',()=>{analystName=dialog.querySelector('#analyst-name').value.trim()||'analyst';try{localStorage.setItem('identityshield-analyst',analystName);}catch{}closeModal();toast('Reviewer preferences saved.');});
-  dialog.querySelector('#check-provider').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const result=await api('/api/ai/check',{method:'POST'});dialog.querySelector('[data-form-message]').innerHTML=`<div class="inline-success">Connected to ${esc(result.provider)} · ${esc(result.model)}.</div>`;}catch(error){inlineError(dialog,error);}finally{button.disabled=false;}});
+  dialog.querySelector('#check-provider').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{const result=await api('/api/ai/check',{method:'POST'});dialog.querySelector('[data-form-message]').innerHTML=`<div class="inline-success">${result.engine==='worker'?'Report worker connected':'Our model is connected'} · ${esc(result.model)}.</div>`;}catch(error){inlineError(dialog,error);}finally{button.disabled=false;}});
 }
 
 let browserEvents=[];

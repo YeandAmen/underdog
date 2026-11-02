@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
+	"github.com/YeandAmen/underdog/internal/domain"
 )
 
 func Snapshot(now time.Time) domain.Snapshot {

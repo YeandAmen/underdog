@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/YeandAmen/identityshield/internal/datasets"
+	"github.com/YeandAmen/underdog/internal/datasets"
 )
 
 func TestLANLCompromiseLabelsDoNotCertifyOtherEvents(t *testing.T) {

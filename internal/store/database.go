@@ -81,6 +81,15 @@ CREATE TABLE IF NOT EXISTS datasets (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS reports (incident_id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS reviews (incident_id TEXT PRIMARY KEY, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS report_jobs (
+id TEXT PRIMARY KEY, incident_id TEXT NOT NULL, evidence_hash TEXT NOT NULL,
+provider TEXT NOT NULL, model TEXT NOT NULL, status TEXT NOT NULL,
+created_at TEXT NOT NULL, updated_at TEXT NOT NULL, lease_until TEXT NOT NULL DEFAULT '',
+claim_token TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0,
+error TEXT NOT NULL DEFAULT '', result TEXT NOT NULL DEFAULT '');
+CREATE UNIQUE INDEX IF NOT EXISTS report_jobs_active ON report_jobs
+(incident_id,evidence_hash,provider,model) WHERE status IN ('queued','running');
+CREATE INDEX IF NOT EXISTS report_jobs_queue ON report_jobs(status,created_at);
 CREATE TABLE IF NOT EXISTS workspace_revision (id INTEGER PRIMARY KEY, value BIGINT NOT NULL);
 INSERT INTO workspace_revision(id,value) VALUES(1,0) ON CONFLICT(id) DO NOTHING;`
 

@@ -1,6 +1,6 @@
 package datasets
 
-import "github.com/YeandAmen/identityshield/internal/domain"
+import "github.com/YeandAmen/underdog/internal/domain"
 
 func Catalog() []domain.CatalogEntry {
 	return []domain.CatalogEntry{

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "underdog/gpt-6.1-sol",
+  "default_agent": "build",
+  "share": "disabled",
+  "autoupdate": false,
+  "snapshot": false,
+  "enabled_providers": ["underdog"],
+  "provider": {
+    "underdog": {
+      "name": "Our model",
+      "npm": "@ai-sdk/openai",
+      "options": {
+        "baseURL": "https://agentrouter.org/v1",
+        "apiKey": "{env:AGENT_ROUTER_API_KEY}",
+        "timeout": 360000
+      },
+      "models": {
+        "gpt-6.1-sol": {
+          "name": "GPT-6.1 Sol",
+          "reasoning": true,
+          "limit": {"context": 200000, "output": 16384},
+          "options": {"store": false}
+        }
+      }
+    }
+  }
+}

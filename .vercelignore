@@ -8,3 +8,5 @@ test-results
 playwright-report
 *.log
 .DS_Store
+.runtime
+internal/opencodecli/assets/opencode.gz

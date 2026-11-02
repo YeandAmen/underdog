@@ -16,8 +16,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/store"
+	"github.com/YeandAmen/underdog/internal/analyst"
+	"github.com/YeandAmen/underdog/internal/store"
 )
+
+const productionURL = "https://underdog-fyield1.vercel.app"
 
 func envFile(path string) map[string]string {
 	values := map[string]string{}
@@ -47,15 +50,90 @@ func main() {
 	}
 }
 func run() error {
-	action := flag.String("action", "verify", "verify, migrate, or env")
+	action := flag.String("action", "verify", "verify, probe-ai, migrate, env, check-web, publish-report, or worker-env")
+	incidentID := flag.String("incident", "", "Incident ID for publish-report")
+	probeFormat := flag.String("format", "", "Optional probe-ai response format: json_object or json_schema")
+	probeTokens := flag.Int("max-output-tokens", 512, "Output-token limit for probe-ai")
+	probeEffort := flag.String("reasoning-effort", "", "Optional reasoning effort for probe-ai")
 	flag.Parse()
 	local := envFile(".env")
 	remote := envFile(".env.local")
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	switch *action {
+	case "worker-env":
+		return configureWorker(ctx, local)
+	case "publish-report":
+		return publishReport(ctx, remote["DATABASE_URL"], local["IDENTITYSHIELD_ACCESS_TOKEN"], *incidentID)
+	case "probe-ai":
+		if *probeTokens < 1 || *probeTokens > 4096 {
+			return fmt.Errorf("probe max-output-tokens must be 1..4096")
+		}
+		payload := map[string]any{"model": "gpt-6.1-sol", "input": "Reply only READY.", "max_output_tokens": *probeTokens, "stream": false, "store": false}
+		if *probeEffort != "" {
+			payload["reasoning"] = map[string]string{"effort": *probeEffort}
+		}
+		if *probeFormat != "" {
+			payload["instructions"] = "Return a JSON object with status equal to READY."
+			payload["input"] = "Return the requested JSON object."
+			switch *probeFormat {
+			case "json_object":
+				payload["text"] = map[string]any{"format": map[string]any{"type": "json_object"}}
+			case "json_schema":
+				payload["text"] = map[string]any{"format": map[string]any{"type": "json_schema", "name": "ready_check", "strict": true, "schema": map[string]any{"type": "object", "properties": map[string]any{"status": map[string]any{"type": "string", "enum": []string{"READY"}}}, "required": []string{"status"}, "additionalProperties": false}}}
+			default:
+				return fmt.Errorf("probe format must be json_object or json_schema")
+			}
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequestWithContext(ctx, "POST", "https://agentrouter.org/v1/responses", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", analyst.AgentRouterUserAgent)
+		req.Header.Set("Authorization", "Bearer "+local["AGENT_ROUTER_API_KEY"])
+		resp, err := (&http.Client{Timeout: 110 * time.Second}).Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		fmt.Printf("Agent Router POST /v1/responses: HTTP %d\n", resp.StatusCode)
+		data, err := io.ReadAll(io.LimitReader(resp.Body, 256<<10))
+		if err != nil {
+			return err
+		}
+		var result struct {
+			Model     string `json:"model"`
+			Status    string `json:"status"`
+			Reasoning struct {
+				Effort string `json:"effort"`
+			} `json:"reasoning"`
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+			Output []struct {
+				Type    string `json:"type"`
+				Content []struct {
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"output"`
+		}
+		if err := json.Unmarshal(data, &result); err != nil {
+			return fmt.Errorf("probe received a non-JSON response")
+		}
+		if result.Error.Message != "" {
+			fmt.Println("Provider error:", strings.ReplaceAll(result.Error.Message, local["AGENT_ROUTER_API_KEY"], "[redacted]"))
+			return nil
+		}
+		fmt.Printf("Model: %s; status: %s; reasoning effort: %s\n", result.Model, result.Status, result.Reasoning.Effort)
+		for _, output := range result.Output {
+			if output.Type == "message" {
+				for _, content := range output.Content {
+					fmt.Println("Reply:", content.Text)
+				}
+			}
+		}
+		return nil
 	case "check-web":
-		cmd := exec.CommandContext(ctx, "npx", "--yes", "vercel", "curl", "/api/state", "--deployment", "https://identityshield.vercel.app", "--", "--silent", "--header", "Authorization: Bearer "+local["IDENTITYSHIELD_ACCESS_TOKEN"])
+		cmd := exec.CommandContext(ctx, "npx", "--yes", "vercel", "curl", "/api/state", "--deployment", productionURL, "--", "--silent", "--header", "Authorization: Bearer "+local["IDENTITYSHIELD_ACCESS_TOKEN"])
 		output, err := cmd.Output()
 		if err != nil {
 			return err
@@ -174,7 +252,21 @@ func run() error {
 			fmt.Fprintln(f, "\nIDENTITYSHIELD_ACCESS_TOKEN="+access)
 			f.Close()
 		}
-		values := map[string]string{"IDENTITYSHIELD_AI_PROVIDER": "agentrouter", "IDENTITYSHIELD_AI_MODEL": "gpt-6.1-sol", "IDENTITYSHIELD_AI_BASE_URL": "https://agentrouter.org/v1", "AGENT_ROUTER_BASE_URL": "https://agentrouter.org/v1", "AGENT_ROUTER_API_KEY": local["AGENT_ROUTER_API_KEY"], "KAGGLE_API_TOKEN": local["KAGGLE_API_TOKEN"], "IDENTITYSHIELD_ACCESS_TOKEN": access, "IDENTITYSHIELD_DEMO": "false"}
+		publicAccess := local["IDENTITYSHIELD_PUBLIC_ACCESS"]
+		if publicAccess == "" {
+			publicAccess = "false"
+		}
+		baseURL := local["IDENTITYSHIELD_AI_BASE_URL"]
+		if baseURL == "" {
+			baseURL = "https://agentrouter.org/v1"
+		}
+		values := map[string]string{"IDENTITYSHIELD_AI_PROVIDER": "agentrouter", "IDENTITYSHIELD_AI_MODEL": "gpt-6.1-sol", "IDENTITYSHIELD_AI_BASE_URL": baseURL, "AGENT_ROUTER_BASE_URL": baseURL, "AGENT_ROUTER_API_KEY": local["AGENT_ROUTER_API_KEY"], "KAGGLE_API_TOKEN": local["KAGGLE_API_TOKEN"], "IDENTITYSHIELD_ACCESS_TOKEN": access, "IDENTITYSHIELD_PUBLIC_ACCESS": publicAccess, "IDENTITYSHIELD_DEMO": "false"}
+		if local["UNDERDOG_WORKER_TOKEN"] != "" {
+			values["UNDERDOG_AI_BACKEND"] = "worker"
+			values["UNDERDOG_WORKER_TOKEN"] = local["UNDERDOG_WORKER_TOKEN"]
+		} else if local["UNDERDOG_AI_BACKEND"] != "" {
+			values["UNDERDOG_AI_BACKEND"] = local["UNDERDOG_AI_BACKEND"]
+		}
 		for key, value := range values {
 			cmd := exec.CommandContext(ctx, "npx", "--yes", "vercel", "env", "add", key, "production", "--force", "--yes")
 			cmd.Stdin = bytes.NewBufferString(value)

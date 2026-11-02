@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/YeandAmen/identityshield/internal/domain"
+	"github.com/YeandAmen/underdog/internal/domain"
 )
 
 // Reprocess updates normalization from preserved originals while retaining

@@ -1,6 +1,8 @@
 .env
 .env.*
 !.env.example
+.runtime/
+internal/opencodecli/assets/opencode.gz
 data/
 bin/
 coverage.out
