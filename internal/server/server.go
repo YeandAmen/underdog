@@ -1065,7 +1065,11 @@ func (s *Server) exportReport(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+incident.ID+`-report.md"`)
-	fmt.Fprintf(w, "# %s\n\n**Case:** %s · **Provider:** %s · **Model:** %s\n\n## Summary\n\n%s\n\n**Suggested verdict:** %s\n\n## Evidence-backed findings\n\n", incident.Title, incident.ID, report.Provider, report.Model, report.Summary, report.Verdict)
+	source := "Our model"
+	if report.Provider == "local" {
+		source = "Local evidence brief"
+	}
+	fmt.Fprintf(w, "# %s\n\n**Case:** %s · **Source:** %s\n\n## Summary\n\n%s\n\n**Suggested verdict:** %s\n\n## Evidence-backed findings\n\n", incident.Title, incident.ID, source, report.Summary, report.Verdict)
 	for _, claim := range report.Claims {
 		fmt.Fprintf(w, "- %s [%s]\n", claim.Text, strings.Join(claim.EvidenceIDs, ", "))
 	}

@@ -52,7 +52,7 @@ The Go/OpenCode worker uses a separate `Authorization: Bearer
 
 | Method | Path | Body |
 | --- | --- | --- |
-| POST | `/api/ai/worker/heartbeat` | `{ "provider": "agentrouter", "model": "gpt-6.1-sol" }` |
+| POST | `/api/ai/worker/heartbeat` | `{ "provider": "agentrouter", "model": "<configured-model-id>" }` |
 | POST | `/api/ai/worker/claim` | Same worker identity; returns an evidence-only task, or 204 when idle |
 | POST | `/api/ai/worker/jobs/{id}/complete` | `{ "claim_token": "...", "report": { ... } }`, or `error` instead of `report` |
 

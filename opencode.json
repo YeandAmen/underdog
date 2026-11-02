@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "underdog/gpt-6.1-sol",
+  "model": "underdog/our-model",
   "default_agent": "build",
   "share": "disabled",
   "autoupdate": false,
@@ -16,8 +16,9 @@
         "timeout": 360000
       },
       "models": {
-        "gpt-6.1-sol": {
-          "name": "GPT-6.1 Sol",
+        "our-model": {
+          "id": "{env:IDENTITYSHIELD_AI_MODEL}",
+          "name": "Our model",
           "reasoning": true,
           "limit": {"context": 200000, "output": 16384},
           "options": {"store": false}

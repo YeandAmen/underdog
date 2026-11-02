@@ -61,6 +61,6 @@ func publishReport(ctx context.Context, databaseURL, accessToken, incidentID str
 	if err := neonSQL(ctx, databaseURL, "INSERT INTO reports(incident_id,data) VALUES($1,$2) ON CONFLICT(incident_id) DO UPDATE SET data=excluded.data", []any{incidentID, string(data)}); err != nil {
 		return err
 	}
-	fmt.Printf("Published %s report for %s: model %s; %d validated claims; production evidence digest matched\n", report.Provider, incidentID, report.Model, len(report.Claims))
+	fmt.Printf("Published Our model report for %s: %d validated claims; production evidence digest matched\n", incidentID, len(report.Claims))
 	return nil
 }

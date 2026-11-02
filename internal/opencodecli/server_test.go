@@ -29,8 +29,12 @@ func TestCredentialIsAnEnvironmentReferenceInOpenCodeConfiguration(t *testing.T)
 	if err := json.Unmarshal([]byte(content), &settings); err != nil {
 		t.Fatal(err)
 	}
-	if settings["model"] != "underdog/gpt-6.1-sol" || settings["share"] != "disabled" {
+	if settings["model"] != "underdog/our-model" || settings["share"] != "disabled" {
 		t.Fatal("the requested model or private-session setting was lost")
+	}
+	model := settings["provider"].(map[string]any)["underdog"].(map[string]any)["models"].(map[string]any)["our-model"].(map[string]any)
+	if model["id"] != "gpt-6.1-sol" || model["name"] != "Our model" {
+		t.Fatal("the display alias lost its configured API model mapping")
 	}
 }
 

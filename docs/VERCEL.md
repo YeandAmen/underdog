@@ -23,7 +23,7 @@ Production is configured for:
 IDENTITYSHIELD_AI_PROVIDER=agentrouter
 UNDERDOG_AI_BACKEND=worker
 UNDERDOG_WORKER_TOKEN=<private repo-worker credential>
-IDENTITYSHIELD_AI_MODEL=gpt-6.1-sol
+IDENTITYSHIELD_AI_MODEL=<configured-model-id>
 IDENTITYSHIELD_AI_BASE_URL=https://agentrouter.org/v1
 AGENT_ROUTER_API_KEY=<server-side credential>
 KAGGLE_API_TOKEN=<server-side credential>
@@ -67,7 +67,7 @@ access to `false` and use the workspace bearer token.
 `check-web` reads local credentials and prints only counts and provider/model
 status. Verify public access separately with a normal unauthenticated request.
 
-The supplied credential and native OpenCode client reach `gpt-6.1-sol` from the
+The supplied credential and native OpenCode client reach our model from the
 repo machine. Both official provider hosts return a browser challenge to Vercel
 and a fresh cloud terminal. Production therefore routes fresh generation to
 the authenticated repo worker. Keep that machine and worker online; saved

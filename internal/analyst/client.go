@@ -237,11 +237,14 @@ func (c *Client) request(ctx context.Context, endpoint string, payload map[strin
 				if c.Config.AIKey != "" {
 					detail = strings.ReplaceAll(detail, c.Config.AIKey, "[redacted]")
 				}
+				if c.Config.AIModel != "" {
+					detail = strings.ReplaceAll(detail, c.Config.AIModel, "our model")
+				}
 				return nil, fmt.Errorf("model provider rejected the request (HTTP 400): %s", detail[:min(800, len(detail))])
 			}
 			return nil, errors.New("model provider rejected the request (HTTP 400); no report was saved")
 		case 503, 404:
-			return nil, fmt.Errorf("model %s is unavailable on this provider (HTTP %d); verify the exact model ID and available channel", c.Config.AIModel, response.StatusCode)
+			return nil, fmt.Errorf("our model is unavailable (HTTP %d); please check the model connection", response.StatusCode)
 		default:
 			return nil, fmt.Errorf("model provider returned HTTP %d; no report was saved", response.StatusCode)
 		}

@@ -70,11 +70,11 @@ func Complete(ctx context.Context, c config.Config, system, input string, schema
 	settings["formatter"], settings["lsp"] = false, false
 	settings["agent"] = map[string]any{"incident-analyst": map[string]any{
 		"description": "Underdog's evidence-grounded incident analyst", "mode": "primary",
-		"model": "underdog/" + c.AIModel, "permission": "deny", "prompt": system,
+		"model": Model, "permission": "deny", "prompt": system,
 	}}
 	if schema == nil {
 		provider := settings["provider"].(map[string]any)["underdog"].(map[string]any)
-		model := provider["models"].(map[string]any)[c.AIModel].(map[string]any)
+		model := provider["models"].(map[string]any)[ModelAlias].(map[string]any)
 		model["limit"] = map[string]int{"context": 200000, "output": 512}
 	}
 	encoded, err := json.Marshal(settings)
@@ -99,7 +99,7 @@ func Complete(ctx context.Context, c config.Config, system, input string, schema
 		input += "\nReturn only JSON matching this report schema. Evidence IDs must be selected from its enum, never from permission-finding IDs:\n" + string(encoded)
 	}
 	output, diagnostics := &limitedOutput{}, &limitedOutput{}
-	args := []string{"run", "--format", "json", "--agent", "incident-analyst", "--model", "underdog/" + c.AIModel, "--title", "Underdog incident report"}
+	args := []string{"run", "--format", "json", "--agent", "incident-analyst", "--model", Model, "--title", "Underdog incident report"}
 	if len(input) < 64<<10 {
 		args = append(args, input)
 	} else {
@@ -248,6 +248,9 @@ func engineError(c config.Config, detail string) error {
 	}
 	if c.AIKey != "" {
 		detail = strings.ReplaceAll(detail, c.AIKey, "[redacted]")
+	}
+	if c.AIModel != "" {
+		detail = strings.ReplaceAll(detail, c.AIModel, "our model")
 	}
 	if strings.Contains(strings.ToLower(detail), "captcha") || strings.Contains(detail, "Unexpected token '<'") {
 		return errors.New("our model service could not accept this server's request; please try again after service access is restored")

@@ -29,7 +29,7 @@ test('Generate follows a queued worker report through progress to cited output',
   await expect(page.locator('#report-message')).toContainText('Waiting for the project worker');
   await expect(page.locator('#report-message')).toContainText('Our model is analysing selected evidence');
   await expect(page.locator('#report-content .report-summary')).toHaveText(report.summary);
-  await expect(page.locator('#report-content .report-status')).toContainText('OUR MODEL · gpt-6.1-sol');
+  await expect(page.locator('#report-content .report-status')).toHaveText('OUR MODEL');
   await expect(page.locator('#report-content .citation')).toHaveAttribute('data-citation',citation);
   await expect(page.getByRole('button',{name:'Generate AI report',exact:true})).toBeEnabled();
   await expect(page.locator('#report-message')).toBeEmpty();

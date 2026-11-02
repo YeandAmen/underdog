@@ -135,7 +135,7 @@ func (w *Worker) WorkOnce(ctx context.Context) (bool, error) {
 	if task.Job.Provider != w.Config.AIProvider || task.Job.Model != w.Config.AIModel {
 		return false, errors.New("the report task does not match the worker's configured model")
 	}
-	slog.Info("Reading incident evidence with OpenCode", "incident", task.Job.IncidentID, "model", task.Job.Model)
+	slog.Info("Reading incident evidence with OpenCode", "incident", task.Job.IncidentID, "model", "Our model")
 	started := time.Now()
 	generation, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	report, generationError := w.Generate(generation, task)
@@ -161,7 +161,7 @@ func (w *Worker) Run(ctx context.Context, interval time.Duration, once bool) err
 	if err := w.Heartbeat(ctx); err != nil {
 		return err
 	}
-	slog.Info("Underdog report worker connected", "workspace", w.URL, "engine", "OpenCode", "model", w.Config.AIModel)
+	slog.Info("Underdog report worker connected", "workspace", w.URL, "engine", "OpenCode", "model", "Our model")
 	heartbeat, stop := context.WithCancel(ctx)
 	defer stop()
 	go func() {
@@ -214,6 +214,9 @@ func (w *Worker) redact(message string) string {
 		if secret != "" {
 			message = strings.ReplaceAll(message, secret, "[redacted]")
 		}
+	}
+	if w.Config.AIModel != "" {
+		message = strings.ReplaceAll(message, w.Config.AIModel, "our model")
 	}
 	return message[:min(1000, len(message))]
 }

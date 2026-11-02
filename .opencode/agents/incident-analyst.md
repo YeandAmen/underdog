@@ -1,7 +1,7 @@
 ---
 description: Produces evidence-grounded incident reports from the normalized evidence supplied by Underdog.
 mode: primary
-model: underdog/gpt-6.1-sol
+model: underdog/our-model
 permission: deny
 ---
 

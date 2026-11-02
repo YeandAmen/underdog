@@ -75,7 +75,7 @@ func Run(args []string) error {
 		if err := flags.Parse(args); err != nil {
 			return err
 		}
-		fmt.Printf("Go workspace: ready\nListen: %s\nStorage: %s\nAI provider: %s\nAI model: %s\nInference credential present: %t\nKaggle credential present: %t\nSynthetic starter data: %t\n", cfg.Addr, cfg.DataDir, cfg.AIProvider, cfg.AIModel, cfg.AIKey != "", cfg.KaggleToken != "" || cfg.KaggleUsername != "" && cfg.KaggleKey != "", cfg.Demo)
+		fmt.Printf("Go workspace: ready\nListen: %s\nStorage: %s\nAI model: Our model\nInference credential present: %t\nKaggle credential present: %t\nSynthetic starter data: %t\n", cfg.Addr, cfg.DataDir, cfg.AIKey != "", cfg.KaggleToken != "" || cfg.KaggleUsername != "" && cfg.KaggleKey != "", cfg.Demo)
 		if *check {
 			ctx, cancel := context.WithTimeout(context.Background(), 110*time.Second)
 			defer cancel()
@@ -153,7 +153,7 @@ func Run(args []string) error {
 			defer cancel()
 			httpServer.Shutdown(shutdown)
 		}()
-		slog.Info("Underdog is ready", "url", "http://"+cfg.Addr, "model", cfg.AIModel)
+		slog.Info("Underdog is ready", "url", "http://"+cfg.Addr, "model", "Our model")
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			return err
 		}

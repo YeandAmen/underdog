@@ -15,6 +15,8 @@ import (
 )
 
 const Version = "1.19.5"
+const ModelAlias = "our-model"
+const Model = "underdog/" + ModelAlias
 
 func ProjectRoot() (string, error) {
 	dir, err := os.Getwd()
@@ -60,16 +62,15 @@ func regularFile(path string) bool {
 }
 
 func Environment(c config.Config, root string) ([]string, error) {
-	model := "underdog/" + c.AIModel
 	settings := map[string]any{
-		"$schema": "https://opencode.ai/config.json", "model": model,
-		"small_model": model, "share": "disabled", "autoupdate": false,
+		"$schema": "https://opencode.ai/config.json", "model": Model,
+		"small_model": Model, "share": "disabled", "autoupdate": false,
 		"snapshot": false, "enabled_providers": []string{"underdog"},
 		"provider": map[string]any{"underdog": map[string]any{
 			"name": "Our model", "npm": "@ai-sdk/openai",
 			"options": map[string]any{"baseURL": c.AIBaseURL, "apiKey": "{env:AGENT_ROUTER_API_KEY}", "timeout": 360000},
-			"models": map[string]any{c.AIModel: map[string]any{
-				"name": c.AIModel, "reasoning": true,
+			"models": map[string]any{ModelAlias: map[string]any{
+				"id": c.AIModel, "name": "Our model", "reasoning": true,
 				"limit":   map[string]int{"context": 200000, "output": 16384},
 				"options": map[string]any{"store": false},
 			}},
@@ -85,6 +86,7 @@ func Environment(c config.Config, root string) ([]string, error) {
 		values[key] = value
 	}
 	values["AGENT_ROUTER_API_KEY"] = c.AIKey
+	values["IDENTITYSHIELD_AI_MODEL"] = c.AIModel
 	values["OPENCODE_CONFIG_CONTENT"] = string(encoded)
 	values["OPENCODE_PURE"] = "1"
 	values["OPENCODE_DISABLE_DEFAULT_PLUGINS"] = "1"

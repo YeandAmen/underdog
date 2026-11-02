@@ -95,7 +95,7 @@ func run() error {
 			return err
 		}
 		defer resp.Body.Close()
-		fmt.Printf("Agent Router POST /v1/responses: HTTP %d\n", resp.StatusCode)
+		fmt.Printf("Our model connection: HTTP %d\n", resp.StatusCode)
 		data, err := io.ReadAll(io.LimitReader(resp.Body, 256<<10))
 		if err != nil {
 			return err
@@ -120,10 +120,17 @@ func run() error {
 			return fmt.Errorf("probe received a non-JSON response")
 		}
 		if result.Error.Message != "" {
-			fmt.Println("Provider error:", strings.ReplaceAll(result.Error.Message, local["AGENT_ROUTER_API_KEY"], "[redacted]"))
+			detail := result.Error.Message
+			if key := local["AGENT_ROUTER_API_KEY"]; key != "" {
+				detail = strings.ReplaceAll(detail, key, "[redacted]")
+			}
+			if model, _ := payload["model"].(string); model != "" {
+				detail = strings.ReplaceAll(detail, model, "our model")
+			}
+			fmt.Println("Model error:", detail)
 			return nil
 		}
-		fmt.Printf("Model: %s; status: %s; reasoning effort: %s\n", result.Model, result.Status, result.Reasoning.Effort)
+		fmt.Printf("Our model: status %s; reasoning effort: %s\n", result.Status, result.Reasoning.Effort)
 		for _, output := range result.Output {
 			if output.Type == "message" {
 				for _, content := range output.Content {
@@ -146,7 +153,7 @@ func run() error {
 		if err := json.Unmarshal(output, &state); err != nil {
 			return fmt.Errorf("deployment did not return a workspace response: %s", string(output[:min(500, len(output))]))
 		}
-		fmt.Printf("Deployed workspace: %d events; %d identities; provider %v; model %v; %d model domains\n", state.Counts["events"], state.Counts["identities"], state.AI["provider"], state.AI["model"], len(state.Models))
+		fmt.Printf("Deployed workspace: %d events; %d identities; Our model; %d model domains\n", state.Counts["events"], state.Counts["identities"], len(state.Models))
 		return nil
 	case "verify":
 		req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.kaggle.com/api/v1/datasets/list/icsdataset/hai-security-dataset?pageSize=20", nil)
