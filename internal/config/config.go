@@ -88,7 +88,7 @@ func Load() (Config, error) {
 		Hosted:         get("VERCEL", "") == "1",
 		OpenCodeBinary: get("UNDERDOG_OPENCODE_BINARY", ""),
 		WorkerToken:    get("UNDERDOG_WORKER_TOKEN", ""),
-		WorkerURL:      get("UNDERDOG_WORKSPACE_URL", "https://underdog-fyield1.vercel.app"),
+		WorkerURL:      get("UNDERDOG_WORKSPACE_URL", "https://underdog-yeandamen.vercel.app"),
 	}
 	if c.Hosted {
 		c.DataDir = "/tmp/identityshield"

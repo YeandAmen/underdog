@@ -20,7 +20,7 @@ import (
 	"github.com/YeandAmen/underdog/internal/store"
 )
 
-const productionURL = "https://underdog-fyield1.vercel.app"
+const productionURL = "https://underdog-yeandamen.vercel.app"
 
 func envFile(path string) map[string]string {
 	values := map[string]string{}

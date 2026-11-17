@@ -2,7 +2,7 @@
 
 **Helping office teams understand access and cyber threats.**
 
-[Open Underdog](https://underdog-fyield1.vercel.app)
+[Open Underdog](https://underdog-yeandamen.vercel.app)
 
 ## Why i built it
 

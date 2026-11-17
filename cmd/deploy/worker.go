@@ -37,7 +37,7 @@ func configureWorker(ctx context.Context, local map[string]string) error {
 		{"UNDERDOG_WORKER_TOKEN", token, "secret"},
 		{"UNDERDOG_AI_BACKEND", "worker", "config"},
 	} {
-		cmd := exec.CommandContext(ctx, "npx", "--yes", "vercel", "env", "add", entry.key, "--environment", "production", "--type", entry.kind, "--force", "--yes", "--scope", "fyield1")
+		cmd := exec.CommandContext(ctx, "npx", "--yes", "vercel", "env", "add", entry.key, "--environment", "production", "--type", entry.kind, "--force", "--yes", "--scope", "yeandamen")
 		cmd.Stdin = bytes.NewBufferString(entry.value)
 		if _, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("configure %s for the hosted worker: %w", entry.key, err)

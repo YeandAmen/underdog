@@ -1,6 +1,6 @@
 # Vercel operations
 
-Production: https://underdog-fyield1.vercel.app
+Production: https://underdog-yeandamen.vercel.app
 
 The native Go runtime builds `cmd/server`, serves the embedded interface, and
 listens on `PORT`. Production uses Neon Postgres through `DATABASE_URL`.
